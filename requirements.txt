@@ -6,3 +6,9 @@ tensorflow
 matplotlib
 pandas
 tqdm
+h5py
+numpy
+seaborn
+opencv
+openpyxl
+scikit-learn
