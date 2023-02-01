@@ -419,7 +419,7 @@ def merge_data(path_,
             ]
 
         elif ctrl == 'HYB':
-            columns = [
+            columns = [reward
                 'Time', 'antennae', 'x', 'y', 'theta', 'tblank', 'entropy',
                 'EDS', 'S_rms', 'wSum', 'hit_B', 'tb_B', 'mode'
             ]

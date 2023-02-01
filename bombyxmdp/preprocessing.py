@@ -1,62 +1,44 @@
 from tqdm import tqdm
 from scipy import stats
-from os.path import isfile, join
-from sklearn.preprocessing import PowerTransformer, RobustScaler, KBinsDiscretizer
+from sklearn.preprocessing import PowerTransformer, KBinsDiscretizer
 from scipy import stats
-import matplotlib.pyplot as plt
-import argparse
-import sys
-import logging
 import numpy as np
 import pandas as pd
 import os
 import glob
-import json
 
 
 def get_linear_vel(x, y, dt):
     """Get linear velocity based on x, y position vectors
-
     Args:
         x (pandas.Series): vector of x positions
         y (pandas.Series): vector of y position
         dt(float): Time step duration
-
     Return:
         dr (pandas.Series) = linear velocity in units of x,y per second
     """
 
     x = x.to_numpy()
     y = y.to_numpy()
-
     dR = np.hypot((x[:-1] - x[1:]), (y[:-1] - y[1:]))
-
     dR = np.insert(dR, 0, 0)
     dR /= dt
-
     dR = pd.Series(dR)
-
     return dR
 
 
 def traveled_distance(x, y):
-
     x = x.to_numpy()
     y = y.to_numpy()
-
     dist = np.hypot((x[:-1] - x[1:]), (y[:-1] - y[1:]))
     dist = np.insert(dist, 0, 0)
-
     return pd.Series(dist)
 
 
 def centerline_deviation(y, dt, y_src=0.):
-
     y = y.to_numpy()
     dy = (y - y_src) * dt
-
     c = np.cumsum(dy)
-
     return pd.Series(c)
 
 
@@ -95,16 +77,12 @@ def merge_data(path_, ignore_idx=True, timeout=0):
 
         # Define time step duration as a convenience variable
         tstep = df['Time'].iloc[1]
-        # tstep = df['Time'].iloc[0]
-        # df['Time'] = df['Time'].sub(tstep)
 
         # Unwrap theta to avoid abrupt changes from 2*pi to 0
         theta = df['theta_rad'].to_numpy()
         df['theta_rad'] = theta
 
         # Calculate angular velocity
-        # dTh = (theta[:-1] - theta[1:])
-        # dTh = np.insert(dTh, 0, 0)
         dTh = np.gradient(theta)
         dTh = ((dTh + np.pi) % (2 * np.pi)) - np.pi
         df['angular_vel'] = dTh / tstep
@@ -113,10 +91,7 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         df['linear_vel'] = get_linear_vel(df['x_mm'], df['y_mm'], tstep)
 
         # Remove outliers in linear and angular velocity
-        # z = np.abs(stats.zscore(df))
         z = np.abs(stats.zscore(df[['linear_vel', 'angular_vel']]))
-        # df = df[(z <= 3).all(axis=1)]
-        # df = df[(z <= 2).all(axis=1)]
 
         df['traveled_distance'] = traveled_distance(df['x_mm'], df['y_mm']).cumsum()
         net_displacement = np.hypot(df['x_mm'].iloc[-1] - df['x_mm'].iloc[0], df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])
@@ -133,9 +108,6 @@ def merge_data(path_, ignore_idx=True, timeout=0):
 
         wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
         df['wind'] = df['wind'].map(wind_dict)
-        # df['wind'] = (df['wind'].sub(4.0)).astype('int')
-
-        # df = resample_data(df, tstep, 780)
 
         # Count cumulative odor hits
         whiff = (df['antennae'].to_numpy() > 0).astype('uint8')
@@ -191,13 +163,9 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         if (timeout > 0):
             if df['Time'].iloc[-1] <= timeout:
                 dfs.append(df)
-                # if df['Time'].iloc[-1] > timeout: dfs.append(df)
                 lengths.append(len(df.index))
-
         else:
             dfs.append(df)
-            # lengths.append(len(df.index))
-
 
     if ignore_idx:
         dfs = pd.concat(dfs, axis=0, ignore_index=True)
@@ -208,8 +176,6 @@ def merge_data(path_, ignore_idx=True, timeout=0):
     print('Successful runs: ({}/{})'.format(sr, len(csvs)))
     print('Average trajectory length: {}'.format(
         pd.Series(lengths).describe().T))
-    # print('Successful run lengths GCD: {}'.format(np.gcd.reduce(lengths)))
-    # print(np.sum(np.log(lengths)))
     return dfs, lengths
 
 
@@ -226,25 +192,18 @@ def yeo_johnson_transform(x):
 
     yj = PowerTransformer(method='yeo-johnson', standardize=True)
     yj.fit(x)
-
     x_yj = yj.transform(x)
-
     return yj, x_yj
 
 
 def discretize(df, kbins, strat_kmeans=False):
-
     if strat_kmeans:
         enc = KBinsDiscretizer(n_bins=kbins,
                                encode='ordinal',
                                strategy='kmeans')
-
     else:
         enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal')
-
     enc.fit(df)
-
     km_edges = enc.bin_edges_
     km_transformed = enc.transform(df)
-
     return km_transformed, km_edges

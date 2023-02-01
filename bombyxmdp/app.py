@@ -206,12 +206,9 @@ def get_expert_demos(df):
     _mdp.encode_states()
     _mdp.encode_actions(verbose=True)
     # _mdp.encode_many_actions(verbose=True)
-    _logger.debug(_mdp.df.columns)
     # Min. linear vel. : 3.99180
     # Angular vel. range: (-0.11700, 0.35100)
 
-    _logger.debug(_mdp.df.groupby('action').linear_vel.describe())
-    _logger.debug(_mdp.df.groupby('action').angular_vel.describe())
     mdp_tp = _mdp.get_transition_probability()
     mdp_edges = pd.DataFrame(
         dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
@@ -303,9 +300,6 @@ def main(args):
     setup_logging(args.loglevel)
 
     dfs, lengths = preproc.merge_data(args.input_dir, timeout=260)
-    # print(dfs[['Time', 'whiff', 'twhiff', 'tblank', 'antennae',
-    #    'lasthit']].head(50))
-    # dfs, lengths = preproc.merge_data(args.input_dir)
 
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
     # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
@@ -326,28 +320,20 @@ def main(args):
     # features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
     print('Shape of feature matrix{}'.format(features.shape))
-    _logger.debug(features.describe())
-
     out_dir = '{}_{}'.format(args.save_csv, fileIO.tstamp())
 
     if args.save_trans_prob:
-
         out_path = fileIO.make_dir(args.input_dir, out_dir)
-        np.save(os.path.join(out_path, '{}.npy'.format(args.save_trans_prob)),
-                mdp_tp)
+        np.save(os.path.join(out_path, '{}.npy'.format(args.save_trans_prob)), mdp_tp)
 
     if args.save_csv:
         edges_path = fileIO.make_dir(args.input_dir, out_dir + '/edges')
-        # feats_path = fileIO.make_dir(args.input_dir, out_dir + '/features')
-
-        mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'),
-                         index=False)
+        mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'), index=False)
         features.to_csv(os.path.join(edges_path, 'features.csv'), index=False)
 
         csv_path = fileIO.make_dir(args.input_dir, out_dir)
 
         for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-
             g.to_csv(os.path.join(csv_path,
                                   '{0}-{1}.csv'.format(len(g.index), i + 1)),
                      index=False)
@@ -373,16 +359,12 @@ def main(args):
         outpath = os.path.join(args.input_dir, args.plot)
         if args.plot == 'trajectories':
             # plot_trajectories(dfs, conf["mothVR"], outpath)
-            plotter.plot_moth_trajectories(dfs, (0, 600), (-360, 360),
-                                           (0, 0, 50), output=outpath + '_moth')
+            plotter.plot_moth_trajectories(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_moth')
 
         elif args.plot == 'xy-joint':
-            # plot_trajectories(dfs, conf["mothVR"], outpath)
-            plotter.plot_moth_xyjoint(dfs, (0, 600), (-360, 360), (0, 0, 50),
-                                      output=outpath + '_jointplot')
+            plotter.plot_moth_xyjoint(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_jointplot')
 
         elif args.plot == 'blanks':
-            # plot_trajectories(dfs, conf["mothVR"], outpath)
             plot_blanks(dfs)
 
         elif args.plot == 'actions':
