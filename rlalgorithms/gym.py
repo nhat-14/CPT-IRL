@@ -22,7 +22,6 @@ from src.envs import smoke_video, wind_tunnel
 EpisodeStats = namedtuple("Stats", ["lengths", "rewards"])
 
 class Gym(object):
-
     def __init__(self,
                 input_dir,
                 config_file,
@@ -48,7 +47,7 @@ class Gym(object):
         self.bin_edges = None
         self.policy = None
         self.irl_num_states = None
-
+        print(self._ctrl)
         if self._ctrl[0] == 'IRL':
             self.bin_edges = self.get_bin_edges()
             self.rewards = self.get_rewards()
@@ -56,8 +55,7 @@ class Gym(object):
             self.irl_num_states = self.cfg["irl"]["num_states"]
 
     def get_bin_edges(self):
-        f = os.path.join(self.input_dir, 'bin_edges',
-                         '{}.csv'.format(self._ctrl[1]))
+        f = os.path.join(self.input_dir, 'bin_edges','{}.csv'.format(self._ctrl[0]))
         bin_edges = pd.read_csv(f)
 
         return bin_edges

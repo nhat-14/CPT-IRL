@@ -28,9 +28,6 @@ from src.envs import smoke_video
 import gym
 from policygradient import actorcritic
 
-logging.getLogger('matplotlib.font_manager').disabled = True
-_logger = logging.getLogger(__name__)
-
 def parse_args(args):
     """Parse command line parameters
 
@@ -120,24 +117,12 @@ def parse_args(args):
         const=logging.DEBUG)
     return parser.parse_args(args)
 
-
-def setup_logging(loglevel):
-    """Setup basic logging
-
-    Args:
-      loglevel (int): minimum loglevel for emitting messages
-    """
-    logformat = "[%(asctime)s] %(levelname)s: %(message)s"
-    logging.basicConfig(level=loglevel, stream=sys.stdout,
-                        format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
-
 def main(args):
     args = parse_args(args)
-    setup_logging(args.loglevel)
-    _logger.info('Starting script')
+    print('Starting script')
 
     # config_file = os.path.join(args.input_dir, args.env, 'config.json')
-    config_file = r"C:\Users\nhatl\Documents\IRL\rlalgorithms\examples\smokevid\config.json"
+    config_file = "/home/nhat/ICT/CPT-IRL/rlalgorithms/examples/smokevid/config.json"
     plumes = [
         i for i in glob.glob(os.path.join(args.input_dir, args.env, '*.h5'))
     ]
@@ -146,7 +131,7 @@ def main(args):
     agt = args.agt
     controller = args.controller
     algo = args.algo
-    _logger.info('RL algorithm: {}'.format(algo))
+    print('RL algorithm: {}'.format(algo))
 
     g = gym.Gym(args.input_dir,
                 config_file,
@@ -157,8 +142,7 @@ def main(args):
                 controller=controller)
 
     if args.save_log or args.plt_traj:
-        out_dir = '{}_{}_{}_{}runs_{}'.format(agt, env, controller[0],
-                                              args.Nruns, fileIO.tstamp())
+        out_dir = '{}_{}_{}_{}runs_{}'.format(agt, env, controller[0], args.Nruns, fileIO.tstamp())
         tmp_dir = fileIO.make_dir(args.input_dir, out_dir)
 
     if args.algo == 'QL':
@@ -167,34 +151,34 @@ def main(args):
         ql_policy.to_csv('QL-policy-revised.csv')
         # print(ql_policy)
         fig, ax = plt.subplots()
-        _logger.info('Mean reward per episode:{}'.format(np.mean(
+        print('Mean reward per episode:{}'.format(np.mean(
             stats.rewards)))
         ax.plot(pd.Series(stats.rewards).rolling(20).mean())
         plt.savefig('QL-episode-rewards', dpi=300)
-        _logger.info('Success rate: {:.4f} +- {:.4f}'.format(
+        print('Success rate: {:.4f} +- {:.4f}'.format(
             p['success_rate'].sum() / args.Nruns, p['success_rate'].std()))
-        _logger.info('Search time: {:.4f} +- {:.4f}'.format(
+        print('Search time: {:.4f} +- {:.4f}'.format(
             p.loc[p.success_rate == 1, 'search_time'].mean(),
             p.loc[p.success_rate == 1, 'search_time'].std()))
 
     elif args.algo == 'SARSA':
         Q, stats, p = g.SARSA(args.Nruns, plumes)
         fig, ax = plt.subplots()
-        _logger.info('Mean reward per episode:{}'.format(np.mean(stats.rewards)))
+        print('Mean reward per episode:{}'.format(np.mean(stats.rewards)))
         ax.plot(pd.Series(stats.rewards).rolling(20).mean())
         plt.savefig('SARSA-episode-rewards', dpi=300)
-        _logger.info('Success rate: {:.4f} +- {:.4f}'.format(
+        print('Success rate: {:.4f} +- {:.4f}'.format(
         p['success_rate'].sum() / args.Nruns, p['success_rate'].std()))
-        _logger.info('Search time: {:.4f} +- {:.4f}'.format(
+        print('Search time: {:.4f} +- {:.4f}'.format(
             p.loc[p.success_rate == 1, 'search_time'].mean(),
             p.loc[p.success_rate == 1, 'search_time'].std()))
 
     elif args.algo == 'AC':
         stats, p, policy = actorcritic.run(g, plumes, args.Nruns)
-        _logger.info("Performance")
-        _logger.info('Success rate: {:.4f} +- {:.4f}'.format(
+        print("Performance")
+        print('Success rate: {:.4f} +- {:.4f}'.format(
             p['success_rate'].sum() / args.Nruns, p['success_rate'].std()))
-        _logger.info('Search time: {:.4f} +- {:.4f}'.format(
+        print('Search time: {:.4f} +- {:.4f}'.format(
             p.loc[p.success_rate == 1, 'search_time'].mean(),
             p.loc[p.success_rate == 1, 'search_time'].std()))
         policy.to_csv('actorcritic-policy.csv', index=False)
@@ -207,16 +191,10 @@ def main(args):
     # dfQ.sort_index(inplace=True)
     # print(dfQ.describe())
     # pd.DataFrame(full_policy).to_csv('actorcritic-fullpolicy.csv', index=False)
-    # _logger.info('Q {}:\n{}'.format(Q.shape, Q))
-    # _logger.info('Performance metrics:')
+    # print('Q {}:\n{}'.format(Q.shape, Q))
+    # print('Performance metrics:')
     # p = pd.DataFrame(g.performance)
-    # _logger.info('End of script')
-
-
-def run():
-    """Entry point for console_scripts
-    """
-    main(sys.argv[1:])
+    # print('End of script')  
 
 if __name__ == "__main__":
-    run()
+    main(sys.argv[1:])
