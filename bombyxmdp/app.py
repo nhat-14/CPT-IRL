@@ -6,16 +6,7 @@ IN: path of directory containing log files (csv format)
 OUT: Csv files with state-action trajectories
 """
 
-from tqdm import tqdm
-from scipy import stats
-from os.path import isfile, join
-from sklearn.preprocessing import PowerTransformer, RobustScaler, KBinsDiscretizer
-from scipy import stats
-from scipy.ndimage import gaussian_filter1d
-from pathlib import Path
-# import tunnel_bombyx.utils as utils
 import argparse
-import datetime
 import sys
 import logging
 import numpy as np
@@ -62,11 +53,6 @@ def parse_args(args):
                         help='Save descriptive stats to xlsx',
                         nargs="?",
                         const='summary')
-    parser.add_argument("--save-trans-prob",
-                        dest="save_trans_prob",
-                        help='Save transition probabilities to .npy',
-                        nargs="?",
-                        const='trans_prob')
     parser.add_argument("--save-csv",
                         dest="save_csv",
                         help='Save merged dataframe to csv',
@@ -194,7 +180,6 @@ def plot_blanks(df, output=None):
 
 
 def get_expert_demos(df):
-
     numeric_states = {0: ['log_tblank', 16, True, True, True]}
     # categoric_states = ['antennae', 'wind']
     categoric_states = ['antennae']
@@ -232,8 +217,8 @@ def get_expert_demos(df):
     ]].copy()
     # print(mdp_demos['hit_rate'].describe())
 
-    _logger.debug('Normalized value counts per action')
-    _logger.debug(_mdp.df['action'].value_counts(normalize=True, sort=False))
+    # Normalized value counts per action
+    print(_mdp.df['action'].value_counts(normalize=True, sort=False))
     # print()
     # plt.plot(_mdp.df['tblank'].unique(),
     #  _mdp.df['tblank'].value_counts(normalize=True, sort=False))
@@ -297,61 +282,51 @@ def get_expert_demos(df):
 
 def main(args):
     args = parse_args(args)
-    setup_logging(args.loglevel)
-
     dfs, lengths = preproc.merge_data(args.input_dir, timeout=260)
-
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
+
     # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
     # plt.show()
     # dflen = len(mdp_demos)
     # # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
+    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
+
     features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
-    # features = mdp_demos.groupby('state_i')[[
-    #     'wind', 'angular_vel', 'log_twhiff', 'lasthit'
-    # ]].mean()
     features['wind'] = features.wind.astype('uint8')
     phi = np.zeros((mdp_tp.shape[0], 2))
-    # phi = np.zeros((mdp_tp.shape[0], 4))
     phi[np.array(features.index)] = features.to_numpy()
-
     features = pd.DataFrame(phi)
+
     # print('Unique values of hit rate: {}'.format(len(features['hit_rate'].unique())))
     # features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
+
     print('Shape of feature matrix{}'.format(features.shape))
-    out_dir = '{}_{}'.format(args.save_csv, fileIO.tstamp())
+    out_dir = 'rldemos_{}'.format(fileIO.tstamp())
+    out_path = fileIO.make_dir(args.input_dir, out_dir)
+    np.save(os.path.join(out_path, 'trans_prob.npy'), mdp_tp)
 
-    if args.save_trans_prob:
-        out_path = fileIO.make_dir(args.input_dir, out_dir)
-        np.save(os.path.join(out_path, '{}.npy'.format(args.save_trans_prob)), mdp_tp)
+    edges_path = fileIO.make_dir(args.input_dir, out_dir + '/edges')
+    mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'), index=False)
+    features.to_csv(os.path.join(edges_path, 'features.csv'), index=False)
+    csv_path = fileIO.make_dir(args.input_dir, out_dir)
 
-    if args.save_csv:
-        edges_path = fileIO.make_dir(args.input_dir, out_dir + '/edges')
-        mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'), index=False)
-        features.to_csv(os.path.join(edges_path, 'features.csv'), index=False)
+    for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
+        g.to_csv(os.path.join(csv_path, '{0}-{1}.csv'.format(len(g.index), i + 1)), index=False)
 
-        csv_path = fileIO.make_dir(args.input_dir, out_dir)
-
-        for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-            g.to_csv(os.path.join(csv_path,
-                                  '{0}-{1}.csv'.format(len(g.index), i + 1)),
-                     index=False)
-
-    if args.save_excel:
-        with pd.ExcelWriter(
-                os.path.join(args.input_dir, '{}_stats.xlsx'.format(
-                    args.save_excel))) as writer:
-            mdp_demos.describe().to_excel(writer,
-                                    float_format="%.4f",
-                                    sheet_name='Description')
-            mdp_demos.head(100).to_excel(writer,
-                                   float_format="%.4f",
-                                   sheet_name='Head')
-            mdp_demos['state_i'].value_counts(normalize=True).to_excel(
-                writer, float_format="%.4f", sheet_name='States')
-            mdp_demos['action'].value_counts(normalize=True).to_excel(
-                writer, float_format="%.4f", sheet_name='Actions')
+    # if args.save_excel:
+    #     with pd.ExcelWriter(os.path.join(args.input_dir, '{}_stats.xlsx'.format(
+    #                 args.save_excel))) as writer:
+    #         mdp_demos.describe().to_excel(writer,
+    #                                 float_format="%.4f",
+    #                                 sheet_name='Description')
+    #         mdp_demos.head(100).to_excel(writer,
+    #                                float_format="%.4f",
+    #                                sheet_name='Head')
+    #         mdp_demos['state_i'].value_counts(normalize=True).to_excel(
+    #             writer, float_format="%.4f", sheet_name='States')
+    #         mdp_demos['action'].value_counts(normalize=True).to_excel(
+    #             writer, float_format="%.4f", sheet_name='Actions')
 
     if args.plot:
         plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))

@@ -47,7 +47,7 @@ class Gym(object):
         self.bin_edges = None
         self.policy = None
         self.irl_num_states = None
-        print(self._ctrl)
+
         if self._ctrl[0] == 'IRL':
             self.bin_edges = self.get_bin_edges()
             self.rewards = self.get_rewards()
@@ -55,22 +55,18 @@ class Gym(object):
             self.irl_num_states = self.cfg["irl"]["num_states"]
 
     def get_bin_edges(self):
-        f = os.path.join(self.input_dir, 'bin_edges','{}.csv'.format(self._ctrl[0]))
+        f = os.path.join(self.input_dir, 'bin_edges.csv')
         bin_edges = pd.read_csv(f)
-
         return bin_edges
 
     def get_policy(self):
-        f = os.path.join(self.input_dir, 'irl_policies',
-                         '{}.h5'.format(self._ctrl[2]))
-
+        f = os.path.join(self.input_dir, 'policy.h5')
         with h5py.File(f, 'r') as hf:
             policy = hf['policy'][:]
-
         return policy
 
     def get_rewards(self):
-        f = os.path.join(self.input_dir, 'rl', '{}.csv'.format('Reward'))
+        f = os.path.join(self.input_dir, 'Reward.csv')
         rewards = pd.read_csv(f, usecols=[1, 2, 3, 4]).values
         return rewards
 
@@ -88,13 +84,13 @@ class Gym(object):
         }.get(self._agt, None)
 
     def set_env(self, plume=None):
-        cfg = self.cfg['env']
+        cfg = self.cfg['field']
 
         if self._env == 'smokevid':
             env = smoke_video.SmokeVideo(self.Nsteps, cfg['width'],
                                          cfg['height'], tuple(cfg['srcpos']),
-                                         tuple(cfg['xspace']),
-                                         tuple(cfg['yspace']), plume)
+                                         tuple(cfg['xlim']),
+                                         tuple(cfg['ylim']), plume)
 
         elif self._env == 'windtunnel':
             env = wind_tunnel.WindTunnel(plume, self.Nsteps, cfg['width'],
@@ -155,8 +151,8 @@ class Gym(object):
 
     def off_grid(self, p: Point, m):
 
-        xs = self.cfg['env']['xspace']
-        ys = self.cfg['env']['yspace']
+        xs = self.cfg['field']['xlim']
+        ys = self.cfg['field']['ylim']
 
         og = not ((min(xs) + m < p.x < max(xs) - m) and
                 (min(ys) + m < p.y < max(ys) - m))
@@ -165,14 +161,14 @@ class Gym(object):
 
     def reached_goal(self, p: Point):
 
-        radius = self.cfg['env']['goalr']
+        radius = self.cfg['field']['goalr']
 
         return (np.sqrt(p.x**2 + p.y**2) < radius)
 
     def plot_trajectory(self, traj, f):
 
-        xsrc, ysrc = tuple(self.cfg['env']['srcpos'])
-        radius = self.cfg['env']['goalr']
+        xsrc, ysrc = tuple(self.cfg['field']['srcpos'])
+        radius = self.cfg['field']['goalr']
 
         fig, ax = plt.subplots()
         ax.add_artist(Circle((xsrc, ysrc), radius, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
@@ -180,8 +176,8 @@ class Gym(object):
         ax.plot(traj.iloc[:,0], traj.iloc[:,1], zorder=3)
         ax.scatter(xsrc, ysrc, marker='*', c='k')
 
-        ax.set_xlim(self.cfg['env']['xspace'])
-        ax.set_ylim(self.cfg['env']['yspace'])
+        ax.set_xlim(self.cfg['field']['xlim'])
+        ax.set_ylim(self.cfg['field']['ylim'])
         ax.set_aspect('equal')
         plt.savefig(f, dpi=300)
 
@@ -231,7 +227,7 @@ class Gym(object):
             log = []
             last_hit = 0
             found_source = 0
-            hit_noise = self.cfg['hit_noise']
+            # hit_noise = self.cfg['hit_noise']
             hit_eps = np.random.binomial(1, self.cfg['hit_probability'])
             done = False
             reward = 0.
@@ -271,9 +267,9 @@ class Gym(object):
                         left_hit = env.hit_at(t, env.mm2px(agent.left_antenna),
                                               plume)
 
-                        if hit_noise:
-                            right_hit *= hit_eps
-                            left_hit *= hit_eps
+                        # if hit_noise:
+                        #     right_hit *= hit_eps
+                        #     left_hit *= hit_eps
 
                     else:
                         right_hit = 0
@@ -388,8 +384,8 @@ class Gym(object):
             log = []
             last_hit = 0
             found_source = 0
-            hit_noise = self.cfg['hit_noise']
-            hit_eps = np.random.binomial(1, self.cfg['hit_probability'])
+            # hit_noise = self.cfg['hit_noise']
+            # hit_eps = np.random.binomial(1, self.cfg['hit_probability'])
             done = False
             reward = 0.
             prev_state = 0
@@ -422,9 +418,9 @@ class Gym(object):
                         left_hit = env.hit_at(t, env.mm2px(agent.left_antenna),
                                               plume)
 
-                        if hit_noise:
-                            right_hit *= hit_eps
-                            left_hit *= hit_eps
+                        # if hit_noise:
+                        #     right_hit *= hit_eps
+                        #     left_hit *= hit_eps
 
                     else:
                         right_hit = 0

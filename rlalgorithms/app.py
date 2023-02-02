@@ -123,15 +123,11 @@ def main(args):
 
     # config_file = os.path.join(args.input_dir, args.env, 'config.json')
     config_file = "/home/nhat/ICT/CPT-IRL/rlalgorithms/examples/smokevid/config.json"
-    plumes = [
-        i for i in glob.glob(os.path.join(args.input_dir, args.env, '*.h5'))
-    ]
+    plumes = [i for i in glob.glob(os.path.join(args.input_dir, args.env, '*.h5')) ]
     tlim = args.tlim
     env = args.env
     agt = args.agt
     controller = args.controller
-    algo = args.algo
-    print('RL algorithm: {}'.format(algo))
 
     g = gym.Gym(args.input_dir,
                 config_file,
@@ -147,16 +143,15 @@ def main(args):
 
     if args.algo == 'QL':
         ql_policy, stats, p = g.Qlearning(args.Nruns, plumes)
-
         ql_policy.to_csv('QL-policy-revised.csv')
-        # print(ql_policy)
         fig, ax = plt.subplots()
-        print('Mean reward per episode:{}'.format(np.mean(
-            stats.rewards)))
+        print('Mean reward per episode:{}'.format(np.mean(stats.rewards)))
         ax.plot(pd.Series(stats.rewards).rolling(20).mean())
         plt.savefig('QL-episode-rewards', dpi=300)
+        
         print('Success rate: {:.4f} +- {:.4f}'.format(
             p['success_rate'].sum() / args.Nruns, p['success_rate'].std()))
+
         print('Search time: {:.4f} +- {:.4f}'.format(
             p.loc[p.success_rate == 1, 'search_time'].mean(),
             p.loc[p.success_rate == 1, 'search_time'].std()))

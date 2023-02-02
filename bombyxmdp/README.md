@@ -15,20 +15,11 @@ Represents raw data from *Bombyx mori* experiments into MDP expert demonstration
 |goal_radius|radius of the goal area                     |
 
 
-- Type `rldemos-mothvr --help` in the terminal to see how to use the script. It should output this: 
-
-```console
-usage: rldemos-mothvr [-h] [--version] [-p [PLOT]] -i INPUT_DIR
-                      [--save-excel [SAVE_EXCEL]]
-                      [--save-trans-prob [SAVE_TRANS_PROB]]
-                      [--save-csv [SAVE_CSV]] [-v] [-vv]
 
 Generate state-action trajectories from Shigaki's 2020 W+O tethered system
 logs
 
 optional arguments:
-  -h, --help            show this help message and exit
-  --version             show program's version number and exit
   -p [PLOT], --plot [PLOT]
                         Plot reward and action-value function
   -i INPUT_DIR, --input-dir INPUT_DIR
@@ -39,8 +30,6 @@ optional arguments:
                         Save transition probabilities to .npy
   --save-csv [SAVE_CSV]
                         Save merged dataframe to csv
-  -v, --verbose         set loglevel to INFO
-  -vv, --very-verbose   set loglevel to DEBUG
 ```
 
 ### Example

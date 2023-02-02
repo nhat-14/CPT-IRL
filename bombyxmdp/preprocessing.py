@@ -98,14 +98,11 @@ def merge_data(path_, ignore_idx=True, timeout=0):
 
         df['tortuosity'] = df['traveled_distance'] / net_displacement
         df['cdv'] = centerline_deviation(df['y_mm'], tstep)
-        # df['heading'] = np.cos(np.pi - df['theta_rad'])
         df['heading'] = np.cos(np.pi - df['theta_rad'])
 
         # Remap values of odor and wind cues to numeric values
         antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
-        # antennae_dict = {0: 2, 1: 1, 2: 3, 3: 0}
         df['antennae'] = df['antennae'].map(antennae_dict)
-
         wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
         df['wind'] = df['wind'].map(wind_dict)
 
@@ -125,8 +122,7 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         df['lasthit'] = df.lasthit.astype('uint8')
 
         # Compute blank duration
-        df['tblank'] = df.groupby(
-            df.antennae.gt(0).cumsum()).cumcount(ascending=True)
+        df['tblank'] = df.groupby(df.antennae.gt(0).cumsum()).cumcount(ascending=True)
         df['tblank'] = df['tblank'].mul(tstep)
         df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
 
@@ -136,8 +132,7 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         df['log_tblank'] = log_tblank
 
         # Compute whiff duration
-        df['twhiff'] = df.groupby(
-            df.antennae.eq(0).cumsum()).cumcount(ascending=True)
+        df['twhiff'] = df.groupby(df.antennae.eq(0).cumsum()).cumcount(ascending=True)
         df['twhiff'] = df['twhiff'].mul(tstep)
         df['twhiff'] = df.loc[:, 'twhiff'].shift(1, fill_value=0)
 
@@ -159,7 +154,6 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         if (np.sqrt(df['x_mm'].iloc[-1]**2 + df['y_mm'].iloc[-1]**2) <= 50):
             sr += 1
 
-
         if (timeout > 0):
             if df['Time'].iloc[-1] <= timeout:
                 dfs.append(df)
@@ -169,13 +163,11 @@ def merge_data(path_, ignore_idx=True, timeout=0):
 
     if ignore_idx:
         dfs = pd.concat(dfs, axis=0, ignore_index=True)
-
     else:
         dfs = pd.concat(dfs, axis=0, ignore_index=False)
 
     print('Successful runs: ({}/{})'.format(sr, len(csvs)))
-    print('Average trajectory length: {}'.format(
-        pd.Series(lengths).describe().T))
+    print('Average trajectory length: {}'.format(pd.Series(lengths).describe().T))
     return dfs, lengths
 
 

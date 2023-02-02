@@ -1,12 +1,9 @@
 import numpy as np
 import pandas as pd
-from collections import namedtuple
-
 import preprocessing as prep
 
 class NumericState(object):
     def __init__(self, name, bins, skewed, logscale, use_kmeans):
-
         self.name = name
         self.bins = bins
         self.skewed = skewed
@@ -16,7 +13,6 @@ class NumericState(object):
 
 class MothMDP(object):
     def __init__(self, df, numeric_states, categoric_states, action_cols):
-
         self.df = df
         self.numeric_states = numeric_states
         self.categoric_states = categoric_states
@@ -259,7 +255,6 @@ class MothMDP(object):
         # Normalize transition probability matrix for each action
         for i in range(tp.shape[0]):
             for j in range(tp.shape[1]):
-
                 tp[i, j] /= np.sum(tp[i, j])
 
         tp = np.nan_to_num(tp)
