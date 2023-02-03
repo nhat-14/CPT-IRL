@@ -12,3 +12,5 @@ seaborn
 opencv
 openpyxl
 scikit-learn
+seaborn
+sklearn

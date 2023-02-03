@@ -44,23 +44,18 @@ def centerline_deviation(y, dt, y_src=0.):
 
 def resample_data(df, dt, tl):
     """Downsample data to the length specified
-
     Args:
         df (pandas.DataFrame): Pandas data frame to resample
         tl (int): Trajectory length of the resampled dataframe
         dt (int): Original sampling period in seconds
-
     Return: Rescaled dataframe
     """
     # Downsample data to trajectory length
     N = len(df)
     T0 = round(dt, 5)
     T1 = round((N / tl) * T0, 5)
-
     df.index = (pd.date_range(0, periods=N, freq='{0:.2f}ms'.format(T0 * 1e3)))
-
     rescaled_df = df.resample('{0:.2f}ms'.format(T1 * 1e3)).pad()  #.mean()
-
     return rescaled_df
 
 
@@ -170,29 +165,9 @@ def merge_data(path_, ignore_idx=True, timeout=0):
     print('Average trajectory length: {}'.format(pd.Series(lengths).describe().T))
     return dfs, lengths
 
-
-def yeo_johnson_transform(x):
-    """Fit and transform data using a yeo-johnson transformation
-
-    Args:
-        x (pandas.Series): Data to fit
-    
-    Return:
-        x_yj (numpy array): Transformed data
-        l (numpy array): Lambdas from yeo-johnson
-    """
-
-    yj = PowerTransformer(method='yeo-johnson', standardize=True)
-    yj.fit(x)
-    x_yj = yj.transform(x)
-    return yj, x_yj
-
-
 def discretize(df, kbins, strat_kmeans=False):
     if strat_kmeans:
-        enc = KBinsDiscretizer(n_bins=kbins,
-                               encode='ordinal',
-                               strategy='kmeans')
+        enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal', strategy='kmeans')
     else:
         enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal')
     enc.fit(df)

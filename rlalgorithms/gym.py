@@ -55,18 +55,18 @@ class Gym(object):
             self.irl_num_states = self.cfg["irl"]["num_states"]
 
     def get_bin_edges(self):
-        f = os.path.join(self.input_dir, 'bin_edges.csv')
+        f = os.path.join(os.getcwd(), self.input_dir, 'bin_edges.csv')
         bin_edges = pd.read_csv(f)
         return bin_edges
 
     def get_policy(self):
-        f = os.path.join(self.input_dir, 'policy.h5')
+        f = os.path.join(os.getcwd(), self.input_dir, 'policy.h5')
         with h5py.File(f, 'r') as hf:
             policy = hf['policy'][:]
         return policy
 
     def get_rewards(self):
-        f = os.path.join(self.input_dir, 'Reward.csv')
+        f = os.path.join(os.getcwd(), self.input_dir, 'Reward.csv')
         rewards = pd.read_csv(f, usecols=[1, 2, 3, 4]).values
         return rewards
 
@@ -398,6 +398,8 @@ class Gym(object):
             prev_state = controller.state
             with h5py.File(plume, 'r') as h5:
                 plume = h5['frames']
+
+
                 # while not done:
                 for t in itertools.count():
 

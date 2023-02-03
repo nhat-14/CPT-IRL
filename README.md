@@ -120,3 +120,14 @@ The following command would save the results of the experiments into csv files:
 ```console
 bombyxsim -i examples/ --conf examples/experiment1.json -n 1 -t 120 -v --save-csv
 ```
+
+
+
+
+
+
+rlalgorithms:
+
+```console
+python app.py -i examples/ -a silkmoth --algorithm QL -e smokevid -c IRL --runs 1 -T 15
+```

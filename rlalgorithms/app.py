@@ -8,23 +8,14 @@ import sys
 import os
 import glob
 import logging
-import datetime
-import random
-from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
-from collections import deque
 
+# from rlalgorithms.tempdiff import qlearning
 # from bombyxsim.utils import colorize
 # from bombyxsim.utils.geometry import Point
 from src.utils import fileIO
-from src import simulator
-from src.agents import silkmoth
-from src.controllers import silkmoth_irl, programmed_behavior
-from src.envs import smoke_video
-# from rlalgorithms.tempdiff import qlearning
 import gym
 from policygradient import actorcritic
 
@@ -119,11 +110,10 @@ def parse_args(args):
 
 def main(args):
     args = parse_args(args)
-    print('Starting script')
 
-    # config_file = os.path.join(args.input_dir, args.env, 'config.json')
-    config_file = "/home/nhat/ICT/CPT-IRL/rlalgorithms/examples/smokevid/config.json"
-    plumes = [i for i in glob.glob(os.path.join(args.input_dir, args.env, '*.h5')) ]
+    config_file = os.path.join(os.getcwd(), args.input_dir, args.env, 'config.json')
+    # config_file = "/home/nhat/ICT/CPT-IRL/rlalgorithms/examples/smokevid/config.json"
+    plumes = [i for i in glob.glob(os.path.join(os.getcwd(), args.input_dir, args.env, '*.h5')) ]
     tlim = args.tlim
     env = args.env
     agt = args.agt

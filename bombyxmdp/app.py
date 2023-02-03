@@ -1,18 +1,15 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
-Generate state-action trajectories plus other useful stats from Shigaki's 2020 tethered moth experiments which incorporate wind stimuli.
+Generate state-action trajectories plus other useful stats from Shigaki's 
+2020 tethered moth experiments which incorporate wind stimuli.
 IN: path of directory containing log files (csv format)
 OUT: Csv files with state-action trajectories
 """
 
 import argparse
 import sys
-import logging
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
 import seaborn as sns
 sns.set(font="sans-serif", rc={"font.sans-serif": ["DejaVu Sans", "Arial"]})
 import os
@@ -20,8 +17,6 @@ import preprocessing as preproc
 import mdp
 import mdp_plots
 import fileIO
-
-_logger = logging.getLogger(__name__)
 
 def parse_args(args):
     """Parse command line parameters
@@ -32,10 +27,7 @@ def parse_args(args):
     Returns:
       :obj:`argparse.Namespace`: command line parameters namespace
     """
-    parser = argparse.ArgumentParser(
-        description=
-        "Generate state-action trajectories from Shigaki's 2020 W+O tethered system logs"
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument("-p",
                         "--plot",
                         dest="plot",
@@ -58,126 +50,7 @@ def parse_args(args):
                         help='Save merged dataframe to csv',
                         nargs='?',
                         const='rldemos')
-    parser.add_argument('-v',
-                        '--verbose',
-                        dest="loglevel",
-                        help="set loglevel to INFO",
-                        action='store_const',
-                        const=logging.INFO)
-    parser.add_argument('-vv',
-                        '--very-verbose',
-                        dest="loglevel",
-                        help="set loglevel to DEBUG",
-                        action='store_const',
-                        const=logging.DEBUG)
     return parser.parse_args(args)
-
-def setup_logging(loglevel):
-    """Setup basic logging
-
-    Args:
-      loglevel (int): minimum loglevel for emitting messages
-    """
-    logformat = "[%(asctime)s] %(levelname)s: %(message)s"
-    logging.basicConfig(level=loglevel,
-                        stream=sys.stdout,
-                        format=logformat,
-                        datefmt="%Y-%m-%d %H:%M:%S")
-
-def plot_actions(df, n_actions, save_path, aspect_equal=False):
-    """Plot Angular vs Linear velocity
-
-    Args:
-        df (pandas.DataFrame): Data frame
-    """
-
-    fig, ax = plt.subplots()
-    ax = sns.scatterplot(x='angular_vel',
-                         y='linear_vel',
-                         data=df,
-                         hue='action',
-                         palette=sns.color_palette("husl", n_actions),
-                         alpha=0.67)
-
-    if aspect_equal:
-        ax.set_aspect('equal')
-
-    plt.savefig(save_path, dpi=300)
-    plt.show()
-
-def plot_trajectories(df, config, output=None):
-
-    xlim = tuple(config["xlim"])
-    ylim = tuple(config["ylim"])
-    srcx, srcy = tuple(config["srcxy"])
-    goal_radius = config["goal_radius"]
-
-    fig, ax = plt.subplots()
-
-    ax.add_artist(
-        Circle((srcx, srcy),
-               goal_radius,
-               color='r',
-               fill=False,
-               linestyle='--',
-               linewidth=0.5,
-               zorder=1))
-
-    for i, g in df.groupby((df.Time.diff() < 0).cumsum()):
-        ax.plot(g.x_mm, g.y_mm, linewidth=1, alpha=0.3, color='k', zorder=3)
-
-    ax.scatter(srcx, srcy, marker='*', c='k')
-    ax.set_xlim(*xlim)
-    ax.set_ylim(*ylim)
-    ax.set_aspect('equal')
-
-    if output is not None:
-        plt.savefig(output, dpi=300)
-    plt.show()
-
-
-def plot_blanks(df, output=None):
-
-    # xlim = tuple(config["xlim"])
-    # ylim = tuple(config["ylim"])
-    # srcx, srcy = tuple(config["srcxy"])
-    # goal_radius = config["goal_radius"]
-
-    # fig, ax = plt.subplots()
-    x = []
-    lens = []
-
-    # ax.add_artist(
-    #     Circle((srcx, srcy),
-    #            goal_radius,
-    #            color='r',
-    #            fill=False,
-    #            linestyle='--',
-    #            linewidth=0.5,
-    #            zorder=1))
-
-    for i, g in df.groupby((df.tblank.diff() < 0).cumsum()):
-        # ax.plot(g.Time, g.tblank, linewidth=1, alpha=0.3, color='k', zorder=3)
-        if len(g) % 33 < 3:
-            g.to_csv(os.path.join(os.getcwd(), '{}_{}.csv'.format(i, len(g))), index=False)
-
-        x.append(g.tblank.iloc[-1])
-        lens.append(len(g))
-
-    # ax = sns.violinplot(data=x)
-    print(pd.Series(x).mean())
-    print(pd.Series(lens).median())
-    print(g)
-
-    # ax.scatter(srcx, srcy, marker='*', c='k')
-    # ax.set_xlim(*xlim)
-    # ax.set_ylim(*ylim)
-    # ax.set_aspect('equal')
-
-    if output is not None:
-        plt.savefig(output, dpi=300)
-    plt.show()
-
 
 def get_expert_demos(df):
     numeric_states = {0: ['log_tblank', 16, True, True, True]}
@@ -287,12 +160,12 @@ def main(args):
 
     # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
     # plt.show()
-    # dflen = len(mdp_demos)
-    # # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
-    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
 
+    # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
+    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
     features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
     features['wind'] = features.wind.astype('uint8')
+
     phi = np.zeros((mdp_tp.shape[0], 2))
     phi[np.array(features.index)] = features.to_numpy()
     features = pd.DataFrame(phi)
@@ -330,24 +203,23 @@ def main(args):
 
     if args.plot:
         plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))
-        # out_path = os.path.join(args.input)
-        outpath = os.path.join(args.input_dir, args.plot)
+        outpath = os.path.join(out_path, 'plots')
         if args.plot == 'trajectories':
-            # plot_trajectories(dfs, conf["mothVR"], outpath)
-            plotter.plot_moth_trajectories(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_moth')
+            plotter.plot_moth_trajectories(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_trajectories')
 
         elif args.plot == 'xy-joint':
             plotter.plot_moth_xyjoint(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_jointplot')
 
-        elif args.plot == 'blanks':
-            plot_blanks(dfs)
-
         elif args.plot == 'actions':
-            # plot_actions(mdp_demos, mdp_tp.shape[1], outpath)
-            # plotter.plot_actions(mdp_demos, 4, 'action', 'Linear vel. (mm/s)',
-            #                      'Angular vel. (rad/s)', '',
-            #                      ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-            #                      outpath + '_mg')
+            plotter.plot_actions(
+                mdp_demos, 
+                4, 
+                'action', 
+                'Linear vel. (mm/s)',
+                'Angular vel. (rad/s)', 
+                '',
+                ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+                outpath + '_mg')
             plotter.plt_action_histograms(
                 mdp_demos.copy(),
                 'linear_vel',
@@ -366,7 +238,6 @@ def main(args):
                 save_path=outpath + '_angv_v2')
 
         elif args.plot == 'heatmap':
-
             plotter.plot_heatmap(mdp_demos, 'state_num_i', 'antennae',
                                  'hits', 'Blank duration',
                                  'Hit antenna', 'Cumulative hits',
@@ -420,7 +291,7 @@ def main(args):
             fig.tight_layout()
             sns.despine(fig)
             # ax.set_xlim(0, 2)
-            plt.savefig('tethered2020-moth-hitrate-v-time', dpi=300)
+            # plt.savefig('tethered2020-moth-hitrate-v-time', dpi=300)
             plt.show()
 
 if __name__ == "__main__":

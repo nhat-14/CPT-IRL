@@ -9,85 +9,51 @@ import pandas as pd
 import glob
 import os
 import h5py
-from tqdm import tqdm, trange
-from scipy.ndimage.filters import gaussian_filter
+from tqdm import tqdm
 
 class MdpPlots(object):
-
     def __init__(self, style, context, figsize, dpi=300, tight=True):
-
         self.style = style
         self.context = context
         self.figsize = figsize
         self.dpi = dpi
         self.tight = tight
 
-
-    def plot_moth_trajectories(self,
-                               df,
-                               xlim,
-                               ylim,
-                               src=(0, 0, 50),
-                               output=None):
-
-        # xlim = tuple(config["xlim"])
-        # ylim = tuple(config["ylim"])
+    # Plot all the moth trajectories
+    def plot_moth_trajectories(self, df, xlim, ylim, src=(0, 0, 50), output=None):
         srcx, srcy, goal_radius = src
-
         sns.set_style('ticks')
         sns.set_context('paper')
         fig, ax = plt.subplots(figsize=(3.4, 2.83))
 
-        ax.add_artist(
-            Circle((srcx, srcy),
-                goal_radius,
-                color='r',
-                fill=False,
-                linestyle='--',
-                linewidth=0.5,
-                zorder=1))
+        ax.add_artist(Circle((srcx, srcy), goal_radius, color='r', 
+            fill=False, linestyle='--', linewidth=0.5, zorder=1))
 
         for i, g in df.groupby((df.Time.diff() < 0).cumsum()):
             ax.plot(g.x_mm, g.y_mm, linewidth=.2, alpha=0.5, color='k', zorder=3)
-            # ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1])
+            ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1], color='g', s=5)
 
         ax.scatter(srcx, srcy, marker='*', c='k')
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
-        # ax.set_xlabel('x (mm)')
-        # ax.set_ylabel('y (mm)')
+        ax.set_xlabel('x (mm)')
+        ax.set_ylabel('y (mm)')
         ax.set_aspect('equal')
         fig.tight_layout()
 
-        if output is not None:
-            plt.savefig(output, dpi=300)
-        plt.show()
+        plt.savefig(output, dpi=300)
+        # plt.show()
 
-    def plot_moth_xyjoint(self,
-                               df,
-                               xlim,
-                               ylim,
-                               src=(0, 0, 50),
-                               output=None):
-
-        srcx, srcy, goal_radius = src
-
+    def plot_moth_xyjoint(self, df, xlim, ylim, src=(0, 0, 50), output=None):
         sns.set_style('ticks')
         sns.set_context('paper')
         fig, ax = plt.subplots(figsize=(3.4, 2.83))
-
-        ax = sns.jointplot(x='x_mm',
-                           y='y_mm',
-                           data=df,
-                           kind='kde',
-                           xlim=(0, 600),
-                           ylim=(-360, 360))
-        #    marginal_kws=dict(bins=32))
+        ax = sns.jointplot(x='x_mm', y='y_mm',
+                           data=df, kind='kde',
+                           xlim=(0, 600), ylim=(-360, 360))
         fig.tight_layout()
-
-        if output is not None:
-            plt.savefig(output, dpi=300)
-        plt.show()
+        plt.savefig(output, dpi=300)
+        # plt.show()
 
     def plot_sim_xyjoint(self, _path, xlim, ylim, src=(0, 0, 50), N=0, output=None):
 
@@ -808,9 +774,9 @@ class MdpPlots(object):
         #                 #  yticklabels=np.arange(-300, 400, 100),
         #                  cbar=True)
         ax = sns.heatmap(df.pivot_table(z, y, x, aggfunc=np.mean,
-                                        fill_value=0),
-                         center=0,
-                         annot=False)
+                        fill_value=0),
+                        center=0,
+                        annot=False)
         ax.invert_yaxis()
         ax.set_title(title)
         ax.set_xlabel(xlabel)
