@@ -20,22 +20,41 @@ def get_linear_vel(x, y, dt):
 
     x = x.to_numpy()
     y = y.to_numpy()
+
+    # result is equivalent to Equivalent to sqrt(x1**2 + x2**2)
     dR = np.hypot((x[:-1] - x[1:]), (y[:-1] - y[1:]))
+    # insert 0 at 0 index to have the same length with
     dR = np.insert(dR, 0, 0)
     dR /= dt
     dR = pd.Series(dR)
     return dR
 
 
-def traveled_distance(x, y):
-    x = x.to_numpy()
-    y = y.to_numpy()
-    dist = np.hypot((x[:-1] - x[1:]), (y[:-1] - y[1:]))
-    dist = np.insert(dist, 0, 0)
-    return pd.Series(dist)
+def get_angular_vel(theta, dt):
+    """Get angular velocity based on x, y position vectors
+    Args:
+        theta (pandas.Series): vector of heading angles (rad)
+        dt (float): Time step duration
+    Return:
+        dTh (pandas.Series) = angular velocity in units of rad per second
+    """
+
+    # avoid abrupt changes from 2*pi to 0 or opposite
+    theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+
+    # Calculate angular velocity. Gradient := (change in y)/(change in x)
+    delta_theta = np.gradient(theta)
+
+    # # avoid abrupt changes from 2*pi to 0 or opposite
+    # delta_theta = ((delta_theta + np.pi) % (2 * np.pi)) - np.pi
+    dTh = delta_theta / dt
+    return dTh
 
 
 def centerline_deviation(y, dt, y_src=0.):
+    """
+        Calculate the deviation of the moth movement along center line (y=0)
+    """
     y = y.to_numpy()
     dy = (y - y_src) * dt
     c = np.cumsum(dy)
@@ -59,37 +78,33 @@ def resample_data(df, dt, tl):
     return rescaled_df
 
 
-def merge_data(path_, ignore_idx=True, timeout=0):
-    csvs = [i for i in glob.glob(os.path.join(path_, '*.csv'))]
+def merge_data(input_dir, ignore_idx=True, timeout=0):
+    """
+        Calculate linear and angular velocity from trajectories and timestamp
+    """
+    csvs = [i for i in glob.glob(os.path.join(input_dir, '*.csv'))]
     dfs = []
     lengths = []
-    sr = 0
+    success_runs = 0    # Number of successful trials
 
-    for c in tqdm(csvs, ncols=0, desc='Merging csv files'):
+    for csvfile in tqdm(csvs, ncols=0, desc='Merging csv files'):
         # Read csv into a dataframe
-        df = pd.read_csv(c)
+        df = pd.read_csv(csvfile)
         df.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
-
-        # Define time step duration as a convenience variable
+ 
+        # Define time step duration as a convenience variable (0.0333s)
         tstep = df['Time'].iloc[1]
-
-        # Unwrap theta to avoid abrupt changes from 2*pi to 0
-        theta = df['theta_rad'].to_numpy()
-        df['theta_rad'] = theta
-
-        # Calculate angular velocity
-        dTh = np.gradient(theta)
-        dTh = ((dTh + np.pi) % (2 * np.pi)) - np.pi
-        df['angular_vel'] = dTh / tstep
 
         # Calculate linear velocity
         df['linear_vel'] = get_linear_vel(df['x_mm'], df['y_mm'], tstep)
 
-        # Remove outliers in linear and angular velocity
-        z = np.abs(stats.zscore(df[['linear_vel', 'angular_vel']]))
+        # Calculate angular velocity
+        df['theta_rad'].to_numpy()
+        df['angular_vel'] = get_angular_vel(df['theta_rad'], tstep)
 
-        df['traveled_distance'] = traveled_distance(df['x_mm'], df['y_mm']).cumsum()
-        net_displacement = np.hypot(df['x_mm'].iloc[-1] - df['x_mm'].iloc[0], df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])
+        df['traveled_distance'] = (df['linear_vel']*tstep).cumsum()
+        net_displacement = np.hypot(df['x_mm'].iloc[-1] - df['x_mm'].iloc[0],
+            df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])
 
         df['tortuosity'] = df['traveled_distance'] / net_displacement
         df['cdv'] = centerline_deviation(df['y_mm'], tstep)
@@ -101,7 +116,8 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
         df['wind'] = df['wind'].map(wind_dict)
 
-        # Count cumulative odor hits
+        # hits: count cumulative odor hits
+        # whiff: binary value of odor detection
         whiff = (df['antennae'].to_numpy() > 0).astype('uint8')
         hits = (whiff[:-1] < whiff[1:]).cumsum()
         hits = np.insert(hits, 0, 0)
@@ -144,10 +160,13 @@ def merge_data(path_, ignore_idx=True, timeout=0):
         df['wind_k'] = df.loc[:, 'wind'].shift(-1, fill_value=0)
 
         # Add column with experiment name
-        experiment_id = os.path.basename(os.path.splitext(c)[0])
+        experiment_id = os.path.basename(os.path.splitext(csvfile)[0])
         df['experiment'] = experiment_id
+
+        df.to_csv("hellllo.csv") 
+
         if (np.sqrt(df['x_mm'].iloc[-1]**2 + df['y_mm'].iloc[-1]**2) <= 50):
-            sr += 1
+            success_runs += 1
 
         if (timeout > 0):
             if df['Time'].iloc[-1] <= timeout:
@@ -161,9 +180,10 @@ def merge_data(path_, ignore_idx=True, timeout=0):
     else:
         dfs = pd.concat(dfs, axis=0, ignore_index=False)
 
-    print('Successful runs: ({}/{})'.format(sr, len(csvs)))
-    print('Average trajectory length: {}'.format(pd.Series(lengths).describe().T))
+    print(f'Successful runs: ({success_runs}/{len(csvs)})')
+    print(f'Average trajectory length: {pd.Series(lengths).describe().T}')
     return dfs, lengths
+
 
 def discretize(df, kbins, strat_kmeans=False):
     if strat_kmeans:

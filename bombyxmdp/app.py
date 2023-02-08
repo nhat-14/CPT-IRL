@@ -7,50 +7,49 @@ OUT: Csv files with state-action trajectories
 
 import argparse
 import sys
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-sns.set(font="sans-serif", rc={"font.sans-serif": ["DejaVu Sans", "Arial"]})
-import os
-import preprocessing as preproc
+import preprocessing
 import mdp
 import mdp_plots
 import fileIO
 
+sns.set(font="sans-serif", rc={"font.sans-serif": ["DejaVu Sans", "Arial"]})
+
+
 def parse_args(args):
     """Parse command line parameters
-
-    Args:
-      args ([str]): command line parameters as list of strings
-
-    Returns:
-      :obj:`argparse.Namespace`: command line parameters namespace
+    Args: args ([str]): command line parameters as list of strings
+    Returns: obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-p",
-                        "--plot",
-                        dest="plot",
-                        help='Plot reward and action-value function',
-                        nargs='?',
-                        const='plot.png')
+        "--plot",
+        dest="plot",
+        help='Plot reward and action-value function',
+        nargs='?',
+        const='plot.png')
     parser.add_argument("-i",
-                        "--input-dir",
-                        type=str,
-                        dest="input_dir",
-                        help='Path of the directory with the input data',
-                        required=True)
+        "--input-dir",
+        type=str,
+        dest="input_dir",
+        help='Path of the directory with the input data',
+        required=True)
     parser.add_argument("--save-excel",
-                        dest="save_excel",
-                        help='Save descriptive stats to xlsx',
-                        nargs="?",
-                        const='summary')
+        dest="save_excel",
+        help='Save descriptive stats to xlsx',
+        nargs="?",
+        const='summary')
     parser.add_argument("--save-csv",
-                        dest="save_csv",
-                        help='Save merged dataframe to csv',
-                        nargs='?',
-                        const='rldemos')
+        dest="save_csv",
+        help='Save merged dataframe to csv',
+        nargs='?',
+        const='rldemos')
     return parser.parse_args(args)
+
 
 def get_expert_demos(df):
     numeric_states = {0: ['log_tblank', 16, True, True, True]}
@@ -155,7 +154,7 @@ def get_expert_demos(df):
 
 def main(args):
     args = parse_args(args)
-    dfs, lengths = preproc.merge_data(args.input_dir, timeout=260)
+    dfs, lengths = preprocessing.merge_data(args.input_dir, timeout=260)
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 
     # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
