@@ -39,16 +39,12 @@ def get_angular_vel(theta, dt):
         dTh (pandas.Series) = angular velocity in units of rad per second
     """
 
+    delta_theta = (theta[:-1] - theta[1:])
     # avoid abrupt changes from 2*pi to 0 or opposite
-    theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-
-    # Calculate angular velocity. Gradient := (change in y)/(change in x)
-    delta_theta = np.gradient(theta)
-
-    # # avoid abrupt changes from 2*pi to 0 or opposite
-    # delta_theta = ((delta_theta + np.pi) % (2 * np.pi)) - np.pi
-    dTh = delta_theta / dt
-    return dTh
+    delta_theta = np.where(delta_theta > 5.0, delta_theta - 2*np.pi, delta_theta)
+    delta_theta = np.where(delta_theta < -5.0, delta_theta + 2*np.pi, delta_theta)
+    delta_theta = np.insert(delta_theta, 0, 0)
+    return delta_theta / dt
 
 
 def centerline_deviation(y, dt, y_src=0.):
@@ -59,6 +55,17 @@ def centerline_deviation(y, dt, y_src=0.):
     dy = (y - y_src) * dt
     c = np.cumsum(dy)
     return pd.Series(c)
+
+
+# def get_tblank(antennae):
+#     """
+#         Compute blank duration before a hit.
+#     """
+#     # no hit during tblank so no change in hit_cum
+#     hit_cum = antennae.gt(0).cumsum()
+#     df['tblank'] = df.groupby(hit_cum).cumcount(ascending=True)
+#     df['tblank'] = df['tblank'].mul(tstep)
+#     df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
 
 
 def resample_data(df, dt, tl):
@@ -78,7 +85,7 @@ def resample_data(df, dt, tl):
     return rescaled_df
 
 
-def merge_data(input_dir, ignore_idx=True, timeout=0):
+def merge_data(input_dir, timeout=0):
     """
         Calculate linear and angular velocity from trajectories and timestamp
     """
@@ -99,9 +106,10 @@ def merge_data(input_dir, ignore_idx=True, timeout=0):
         df['linear_vel'] = get_linear_vel(df['x_mm'], df['y_mm'], tstep)
 
         # Calculate angular velocity
-        df['theta_rad'].to_numpy()
-        df['angular_vel'] = get_angular_vel(df['theta_rad'], tstep)
-
+        theta = df['theta_rad'].to_numpy()
+        df['theta_rad'] = theta
+        df['angular_vel'] = get_angular_vel(theta, tstep)
+        
         df['traveled_distance'] = (df['linear_vel']*tstep).cumsum()
         net_displacement = np.hypot(df['x_mm'].iloc[-1] - df['x_mm'].iloc[0],
             df['y_mm'].iloc[-1] - df['y_mm'].iloc[0])
@@ -123,19 +131,27 @@ def merge_data(input_dir, ignore_idx=True, timeout=0):
         hits = np.insert(hits, 0, 0)
         df['whiff'] = whiff
         df['hits'] = hits.astype('int')
+
+        # get number of hits per 1 second
         df.loc[:, 'hit_rate'] = df['whiff'].rolling(int(1 / tstep)).sum()
 
-        # Get last hit
+        # Get last hit (Both, Left, Right).  
         df.loc[:, 'lasthit'] = df[df.antennae > 0].antennae
         df['lasthit'].fillna(method='ffill', inplace=True)
+        # ffill: propagate last hit forward when no recent hits
         df['lasthit'] = df.loc[:, 'lasthit'].shift(1, fill_value=0)
         df['lasthit'].fillna(0, inplace=True)
         df['lasthit'] = df.lasthit.astype('uint8')
 
-        # Compute blank duration
-        df['tblank'] = df.groupby(df.antennae.gt(0).cumsum()).cumcount(ascending=True)
+        # Calculate blank duration
+        # df['tblank'] = get_tblank(df.antennaep)
+
+        # no hit during tblank so no change in hit_cum
+        hit_cum = df.antennae.gt(0).cumsum()
+        df['tblank'] = df.groupby(hit_cum).cumcount(ascending=True)
         df['tblank'] = df['tblank'].mul(tstep)
         df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
+        
 
         # Transform blank duration to log scale to reduce skewness
         tblank = df['tblank'].to_numpy()
@@ -168,17 +184,14 @@ def merge_data(input_dir, ignore_idx=True, timeout=0):
         if (np.sqrt(df['x_mm'].iloc[-1]**2 + df['y_mm'].iloc[-1]**2) <= 50):
             success_runs += 1
 
-        if (timeout > 0):
+        if timeout > 0:
             if df['Time'].iloc[-1] <= timeout:
                 dfs.append(df)
                 lengths.append(len(df.index))
         else:
             dfs.append(df)
 
-    if ignore_idx:
-        dfs = pd.concat(dfs, axis=0, ignore_index=True)
-    else:
-        dfs = pd.concat(dfs, axis=0, ignore_index=False)
+    dfs = pd.concat(dfs, axis=0, ignore_index=True)
 
     print(f'Successful runs: ({success_runs}/{len(csvs)})')
     print(f'Average trajectory length: {pd.Series(lengths).describe().T}')
