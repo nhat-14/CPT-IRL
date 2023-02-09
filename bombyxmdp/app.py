@@ -61,7 +61,7 @@ def get_expert_demos(df):
     print(_mdp.df[['linear_vel', 'angular_vel', 'tblank']].describe())
 
     _mdp.encode_states()
-    _mdp.encode_actions(verbose=True)
+    _mdp.encode_actions()
     # _mdp.encode_many_actions(verbose=True)
     # Min. linear vel. : 3.99180
     # Angular vel. range: (-0.11700, 0.35100)

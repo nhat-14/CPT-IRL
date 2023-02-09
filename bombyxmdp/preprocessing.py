@@ -1,11 +1,9 @@
-from tqdm import tqdm
-from scipy import stats
-from sklearn.preprocessing import PowerTransformer, KBinsDiscretizer
-from scipy import stats
-import numpy as np
-import pandas as pd
 import os
 import glob
+from tqdm import tqdm
+from sklearn.preprocessing import KBinsDiscretizer
+import numpy as np
+import pandas as pd
 
 
 def get_linear_vel(x, y, dt):
@@ -57,17 +55,6 @@ def centerline_deviation(y, dt, y_src=0.):
     return pd.Series(c)
 
 
-# def get_tblank(antennae):
-#     """
-#         Compute blank duration before a hit.
-#     """
-#     # no hit during tblank so no change in hit_cum
-#     hit_cum = antennae.gt(0).cumsum()
-#     df['tblank'] = df.groupby(hit_cum).cumcount(ascending=True)
-#     df['tblank'] = df['tblank'].mul(tstep)
-#     df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
-
-
 def resample_data(df, dt, tl):
     """Downsample data to the length specified
     Args:
@@ -81,7 +68,7 @@ def resample_data(df, dt, tl):
     T0 = round(dt, 5)
     T1 = round((N / tl) * T0, 5)
     df.index = (pd.date_range(0, periods=N, freq='{0:.2f}ms'.format(T0 * 1e3)))
-    rescaled_df = df.resample('{0:.2f}ms'.format(T1 * 1e3)).pad()  #.mean()
+    rescaled_df = df.resample(f'{T1 * 1e3:.2f}ms').pad()  #.mean()
     return rescaled_df
 
 
@@ -144,19 +131,14 @@ def merge_data(input_dir, timeout=0):
         df['lasthit'] = df.lasthit.astype('uint8')
 
         # Calculate blank duration
-        # df['tblank'] = get_tblank(df.antennaep)
-
         # no hit during tblank so no change in hit_cum
         hit_cum = df.antennae.gt(0).cumsum()
         df['tblank'] = df.groupby(hit_cum).cumcount(ascending=True)
         df['tblank'] = df['tblank'].mul(tstep)
         df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
         
-
         # Transform blank duration to log scale to reduce skewness
-        tblank = df['tblank'].to_numpy()
-        log_tblank = np.log1p(tblank)
-        df['log_tblank'] = log_tblank
+        df['log_tblank'] = np.log1p(df['tblank'].to_numpy())
 
         # Compute whiff duration
         df['twhiff'] = df.groupby(df.antennae.eq(0).cumsum()).cumcount(ascending=True)
@@ -178,8 +160,6 @@ def merge_data(input_dir, timeout=0):
         # Add column with experiment name
         experiment_id = os.path.basename(os.path.splitext(csvfile)[0])
         df['experiment'] = experiment_id
-
-        df.to_csv("hellllo.csv") 
 
         if (np.sqrt(df['x_mm'].iloc[-1]**2 + df['y_mm'].iloc[-1]**2) <= 50):
             success_runs += 1

@@ -37,12 +37,9 @@ class MothMDP(object):
         return X_d
 
     def digitize_numeric_state(self, state):
-
         if state.skewed:
             return self.digitize_skewed_state(state)
-
-        else:
-            return self.digitize_normal_state(state)
+        return self.digitize_normal_state(state)
 
     def digitize_normal_state(self, state):
 
@@ -81,14 +78,15 @@ class MothMDP(object):
         if state.logscale: edges = np.expm1(edges)
         return edges
 
-    def digitize_numeric_states(self, states):
 
+    def digitize_numeric_states(self, states):
         for s in states:
             edges = self.digitize_numeric_state(s)
             if s.logscale:
                 self.digi_edges[s.name.replace('log_', '')] = edges
             else:
                 self.digi_edges[s.name] = edges
+
 
     def merge_numeric_states(self, states):
 
@@ -119,8 +117,8 @@ class MothMDP(object):
         self.df.loc[:, 'state_i'] = self.df[ni] + self.df[ci] * num_bits
         self.df.loc[:, 'state_k'] = self.df[nk] + self.df[ck] * num_bits
 
-    def encode_states(self):
 
+    def encode_states(self):
         _numeric_states = []
         for key in self.numeric_states:
             _numeric_states.append(NumericState(*self.numeric_states[key]))
@@ -153,33 +151,28 @@ class MothMDP(object):
         # Merge numeric and categoric states
         self.merge_states()
 
-    def encode_actions(self, verbose=False):
+    def encode_actions(self):
+        """
+            From linear velocity and angular velocity, encode the actions
+            in each step time in to one of (surge, turn ccw, turn cw, stop)
+        """
         lin_vel, ang_vel = tuple(self.action_cols)
         lv_min = self.df[lin_vel].mean() - self.df[lin_vel].std()
-        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45),
-        # self.df[lin_vel].quantile(0.55))
+        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45), self.df[lin_vel].quantile(0.55))
         # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        # av_lo, av_hi = (-.087, .087)
-        av_lo, av_hi = (self.df[ang_vel].quantile(0.40),
-                        self.df[ang_vel].quantile(0.60))
+        av_lo, av_hi = (self.df[ang_vel].quantile(0.40), self.df[ang_vel].quantile(0.60))
 
-        if verbose:
+        print(f'Min. linear vel. : {lv_min:.5f}')
+        print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-            print('Min. linear vel. : {:.5f}'.format(lv_min))
-            # print('Linear vel. range: ({:.5f}, {:.5f})'.format(lv_lo, lv_hi))
-            print('Angular vel. range: ({:.5f}, {:.5f})'.format(av_lo, av_hi))
-
-        # stop = (self.df[lin_vel] < lv_min) & (self.df[ang_vel].between(
-        #     av_lo, av_hi, inclusive=True))
         surge = self.df[lin_vel].gt(lv_min) & self.df[ang_vel].between(
-            av_lo, av_hi, inclusive=True)
-        turn_ccw = ~(surge) & (self.df[ang_vel] > av_hi)  # & (self.df[lin_vel] >= lv_min)
-        turn_cw = ~(surge) & (self.df[ang_vel] < av_lo)  # & (self.df[lin_vel] >= lv_min)
+            av_lo, av_hi, inclusive="both")
+        turn_ccw = ~(surge) & (self.df[ang_vel] > av_hi)
+        turn_cw = ~(surge) & (self.df[ang_vel] < av_lo)
 
+        # stop = 0; surge = 1; turn ccw = 2, turn cw = 3
         for i, a in enumerate([surge, turn_ccw, turn_cw]):
             self.df.loc[a, 'action'] = i + 1
-
-        # self.df.loc[stop, 'action'] = 0
         self.df['action'].fillna(0, inplace=True)
         self.df['action'] = self.df.action.astype('uint8')
 
@@ -268,7 +261,9 @@ class MothMDP(object):
 
     @property
     def info(self):
-        return 'Numeric states: {}\nCategoric states: {}\n(u/n) states: {:.5f} ({}/{})\n(u/n) actions: ({}/{})'.format(
-            self.numeric_states, self.categoric_states,
-            (self.u_states / self.n_states), self.u_states, self.n_states,
-            self.u_actions, self.n_actions)
+        msg = f'Numeric states: {self.numeric_states}\n \
+            Categoric states: {self.categoric_states}\n \
+            (u/n) states: {(self.u_states / self.n_states):.5f} \
+            ({self.u_states}/{self.n_states})\n \
+            (u/n) actions: ({self.u_actions}/{self.n_actions})'
+        return msg
