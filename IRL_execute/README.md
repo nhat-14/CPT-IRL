@@ -11,8 +11,8 @@ Extract reward and action-value functions with:
 - Such states and actions must be in csv files with column names `state` and `action` like:
 
 
-|state	|action|
-|-----	|------|
+|state|action|
+|-----|------|
 |0		|1     |
 
 - Set the values of discount, epochs, learning rate, trajectory length by editing the file `config.json`
