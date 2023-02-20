@@ -44,9 +44,12 @@ docs/api/*
 docs/_rst/*
 docs/_build/*
 cover/*
+bombyxmdp/data/trajectories/rldemos*
 MANIFEST
 
 # Per-project virtualenvs
 .venv*/
 .vscode/*
 experiments/*
+
+*.h5

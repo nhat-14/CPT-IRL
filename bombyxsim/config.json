@@ -1,0 +1,36 @@
+{
+    "FPS": 30,
+    "env_type": "smokevid",
+    "field": {
+        "srcpos": [0, 0],
+        "xlim": [0, 500],
+        "ylim": [-200, 200],
+        "width": 1024,
+        "height": 1024,
+        "goalr": 50
+    },
+    "controller_type":["KPB"],
+    "irl":{
+        "num_states": ["tblank", "hits"]
+    },
+    "agent_type":"silkmoth",
+    "init_pose": [450.0, 0.0, 180.0],
+    "random_start": true,
+    "init_pose_eps_type": "randint",
+    "init_pose_eps": [
+        10.0,
+        10.0,
+        30.0
+    ],
+    "wind_angle": 0.0,
+    "infotaxis":{
+        "wind_speed": 0.65,
+        "diffusivity": 0.1,
+        "emission_rate": 1,
+        "particle_lifetime":30,
+        "grid_shape": [30, 36],
+        "agent_size": 0.020,
+        "agent_speed": 0.040,
+        "src_radius":0.005
+    }
+}
