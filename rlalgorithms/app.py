@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Main console script for the silkmoth simulator
-"""
-
 import argparse
 import sys
 import os
@@ -110,7 +105,6 @@ def parse_args(args):
 
 def main(args):
     args = parse_args(args)
-
     config_file = os.path.join(os.getcwd(), args.input_dir, args.env, 'config.json')
     # config_file = "/home/nhat/ICT/CPT-IRL/rlalgorithms/examples/smokevid/config.json"
     plumes = [i for i in glob.glob(os.path.join(os.getcwd(), args.input_dir, args.env, '*.h5')) ]
