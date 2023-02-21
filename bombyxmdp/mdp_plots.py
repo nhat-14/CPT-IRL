@@ -42,7 +42,7 @@ class MdpPlots(object):
         fig.tight_layout()
 
         plt.savefig(output, dpi=300)
-        # plt.show()
+        plt.show()
 
     def plot_moth_xyjoint(self, df, xlim, ylim, src=(0, 0, 50), output=None):
         sns.set_style('ticks')

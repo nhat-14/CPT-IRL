@@ -12,11 +12,10 @@ class NumericState(object):
 
 
 class MothMDP(object):
-    def __init__(self, df, numeric_states, categoric_states, action_cols):
-        self.df = df
+    def __init__(self, df, numeric_states, categoric_states):
+        self.df = df 
         self.numeric_states = numeric_states
         self.categoric_states = categoric_states
-        self.action_cols = action_cols
         self.num_state_bits = 0
         self.digi_edges = {}
         self.n_states = 0
@@ -25,7 +24,6 @@ class MothMDP(object):
         self.u_actions = 0
 
     def _digitize(self, X, edges):
-
         bins = len(edges) - 1
         rtol = 1.e-5
         atol = 1.e-8
@@ -33,16 +31,9 @@ class MothMDP(object):
 
         X_d = np.digitize(X + eps, edges[1:])
         X_d = np.clip(X_d, 0, bins - 1)
-
         return X_d
 
-    def digitize_numeric_state(self, state):
-        if state.skewed:
-            return self.digitize_skewed_state(state)
-        return self.digitize_normal_state(state)
-
     def digitize_normal_state(self, state):
-
         states_k = [state.name, state.name + '_k']
         states_digi = [sk + '_digi' for sk in states_k]
 
@@ -57,7 +48,11 @@ class MothMDP(object):
         return edges
 
     def digitize_skewed_state(self, state, _quantile=.98):
-
+        """
+            The last bin of the digitalize state is define as
+            from the quantile(0.98) to the max value
+        """
+        # last bin := [quantile(0.98); max value)
         vmax = self.df[state.name].max()
         tail = self.df[state.name] > self.df[state.name].quantile(_quantile)
         vrange = self.df[~tail]
@@ -67,37 +62,30 @@ class MothMDP(object):
         states_digi = [sk + '_digi' for sk in states_k]
 
         _, edges = prep.discretize(vrange[states_k],
-                                   bins,
-                                   strat_kmeans=state.use_kmeans)
+            bins,
+            strat_kmeans=state.use_kmeans)
+        
         edges = np.append(edges[0], vmax)
 
-        for i, sd in enumerate(states_digi):
-            self.df.loc[:, sd] = self._digitize(
-                self.df[states_k[i]].to_numpy(), edges)
+        for i, state_digi in enumerate(states_digi):
+            self.df.loc[:, state_digi] = self._digitize(self.df[states_k[i]].to_numpy(), edges)
 
-        if state.logscale: edges = np.expm1(edges)
+        if state.logscale:
+            edges = np.expm1(edges)
         return edges
 
 
-    def digitize_numeric_states(self, states):
-        for s in states:
-            edges = self.digitize_numeric_state(s)
-            if s.logscale:
-                self.digi_edges[s.name.replace('log_', '')] = edges
-            else:
-                self.digi_edges[s.name] = edges
+    def digitize_numeric_states(self, state):
+        if state.skewed:
+            edges = self.digitize_skewed_state(state)
+        else:
+            edges = self.digitize_normal_state(state)
 
+        if state.logscale:
+            self.digi_edges[state.name.replace('log_', '')] = edges
+        else:
+            self.digi_edges[state.name] = edges
 
-    def merge_numeric_states(self, states):
-
-        s0, s1 = tuple([s.name + '_digi' for s in states])
-        sk0, sk1 = tuple([s.name + '_k_digi' for s in states])
-        b0, b1 = (states[0].bins, states[1].bins)
-
-        self.df.loc[:, 'state_num_i'] = self.df[s0] + self.df[s1] * b0
-        self.df.loc[:, 'state_num_k'] = self.df[sk0] + self.df[sk1] * b0
-
-        self.num_state_bits = b0 * b1
 
     def merge_categoric_states(self):
 
@@ -119,24 +107,18 @@ class MothMDP(object):
 
 
     def encode_states(self):
-        _numeric_states = []
-        for key in self.numeric_states:
-            _numeric_states.append(NumericState(*self.numeric_states[key]))
+        state_obj = NumericState(*self.numeric_states)
 
         # Digitize numeric states
-        self.digitize_numeric_states(_numeric_states)
+        self.digitize_numeric_states(state_obj)
+        state_name = self.numeric_states[0]
 
-        if len(self.numeric_states) > 1:
-            # Merge numeric states
-            self.merge_numeric_states(_numeric_states)
-
-        else:
-            print(f'numeric state: {self.numeric_states[0][0]}')
-            ni, nk = (self.numeric_states[0][0] + '_digi',
-                      self.numeric_states[0][0] + '_k_digi')
-            self.df.loc[:, 'state_num_i'] = self.df[ni]
-            self.df.loc[:, 'state_num_k'] = self.df[nk]
-            self.num_state_bits = self.numeric_states[0][1]
+        print("============================================================")
+        print(f'numeric state: {state_name}')
+        ni, nk = (state_name + '_digi', state_name + '_k_digi')
+        self.df.loc[:, 'state_num_i'] = self.df[ni]
+        self.df.loc[:, 'state_num_k'] = self.df[nk]
+        self.num_state_bits = self.numeric_states[1]
 
         if len(self.categoric_states) > 1:
             # Merge categoric states
@@ -156,19 +138,18 @@ class MothMDP(object):
             From linear velocity and angular velocity, encode the actions
             in each step time in to one of (surge, turn ccw, turn cw, stop)
         """
-        lin_vel, ang_vel = tuple(self.action_cols)
-        lv_min = self.df[lin_vel].mean() - self.df[lin_vel].std()
+        lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
         # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45), self.df[lin_vel].quantile(0.55))
         # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        av_lo, av_hi = (self.df[ang_vel].quantile(0.40), self.df[ang_vel].quantile(0.60))
+        av_lo, av_hi = (self.df['angular_vel'].quantile(0.40), self.df['angular_vel'].quantile(0.60))
 
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-        surge = self.df[lin_vel].gt(lv_min) & self.df[ang_vel].between(
+        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
             av_lo, av_hi, inclusive="both")
-        turn_ccw = ~(surge) & (self.df[ang_vel] > av_hi)
-        turn_cw = ~(surge) & (self.df[ang_vel] < av_lo)
+        turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
+        turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
         # stop = 0; surge = 1; turn ccw = 2, turn cw = 3
         for i, a in enumerate([surge, turn_ccw, turn_cw]):
@@ -177,16 +158,15 @@ class MothMDP(object):
         self.df['action'] = self.df.action.astype('uint8')
 
     def encode_many_actions(self, verbose=False):
-        lin_vel, ang_vel = tuple(self.action_cols)
-        lv_min = self.df[lin_vel].mean() - self.df[lin_vel].std()
+        lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
         # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45),
         # self.df[lin_vel].quantile(0.55))
         # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
         # av_lo, av_hi = (-.087, .087)
-        av_lo, av_l, av_h, av_hi = (self.df[ang_vel].quantile(0.20),
-                                    self.df[ang_vel].quantile(0.40),
-                                    self.df[ang_vel].quantile(0.60),
-                                    self.df[ang_vel].quantile(0.80))
+        av_lo, av_l, av_h, av_hi = (self.df['angular_vel'].quantile(0.20),
+                                    self.df['angular_vel'].quantile(0.40),
+                                    self.df['angular_vel'].quantile(0.60),
+                                    self.df['angular_vel'].quantile(0.80))
 
         if verbose:
 
@@ -194,16 +174,14 @@ class MothMDP(object):
             # print('Linear vel. range: ({:.5f}, {:.5f})'.format(lv_lo, lv_hi))
             print('Angular vel. range: ({:.5f}, {:.5f})'.format(av_lo, av_hi))
 
-        # stop = (self.df[lin_vel] < lv_min) & (self.df[ang_vel].between(
-        #     av_lo, av_hi, inclusive=True))
-        surge = self.df[lin_vel].gt(lv_min) & self.df[ang_vel].between(
+        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
             av_lo, av_hi, inclusive=True)
-        turn_ccw = ~(surge) & (self.df[ang_vel] > av_hi)
-        turn_left = ~(surge) & (self.df[ang_vel].between(
+        turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
+        turn_left = ~(surge) & (self.df['angular_vel'].between(
             av_h, av_hi, inclusive=True))
-        turn_right = ~(surge) & (self.df[ang_vel].between(
+        turn_right = ~(surge) & (self.df['angular_vel'].between(
             av_lo, av_l, inclusive=True))
-        turn_cw = ~(surge) & (self.df[ang_vel] < av_lo)
+        turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
         for i, a in enumerate(
             [surge, turn_ccw, turn_left, turn_right, turn_cw]):
