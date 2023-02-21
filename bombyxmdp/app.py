@@ -58,6 +58,7 @@ def get_expert_demos(df):
     action_cols = ['linear_vel', 'angular_vel']
 
     _mdp = mdp.MothMDP(df, numeric_states, categoric_states, action_cols)
+    print("============================================================")
     print(_mdp.df[['linear_vel', 'angular_vel', 'tblank']].describe())
 
     _mdp.encode_states()
@@ -84,7 +85,8 @@ def get_expert_demos(df):
     # ]].copy()
 
     mdp_demos = _mdp.df[[
-        'Time', 'x_mm', 'y_mm', 'linear_vel', 'angular_vel', 'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
+        'Time', 'x_mm', 'y_mm', 'linear_vel', 'angular_vel', 
+        'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
         'antennae', 'state_num_i', 'state_i', 'action'
     ]].copy()
     # print(mdp_demos['hit_rate'].describe())

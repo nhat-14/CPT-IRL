@@ -76,7 +76,7 @@ def merge_data(input_dir, timeout=0):
     """
         Calculate linear and angular velocity from trajectories and timestamp
     """
-    csvs = [i for i in glob.glob(os.path.join(input_dir, '*.csv'))]
+    csvs = list(glob.glob(os.path.join(input_dir, '*.csv')))
     dfs = []
     lengths = []
     success_runs = 0    # Number of successful trials
