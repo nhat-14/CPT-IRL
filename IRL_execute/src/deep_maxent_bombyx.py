@@ -1,29 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This file estimates the reward function of a silkmoth based on Deep Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
+This file estimates the reward function of a silkmoth based on Deep 
+Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
 """
 
-from myirl.irl.mdp import neo_mothworld
-from myirl.irl import value_iteration
-from myirl.irl import deep_maxent
-from getpass import getpass
-from pathlib import Path
-import warnings
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=FutureWarning)
-import h5py
 import json
 import glob
 import os
-import argparse
 import sys
 import datetime
 import logging
+from pathlib import Path
+import argparse
+import h5py
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from myirl.irl.mdp import neo_mothworld
+from myirl.irl import value_iteration
+from myirl.irl import deep_maxent
+
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
 def tstamp(): 
@@ -107,40 +105,37 @@ def parse_args(args):
     return parser.parse_args(args)
 
 
-def read_trajectories(csvs, cols, tl=0):
+def read_trajectories(csvs, cols, traj_length=0):
+    """
+        Make a (T, L, 2) 3D numpy array where T is the number 
+        of csv files and L is the trajectory length.
+        2 means two columns (of states-actions)
+    """
 
     trajs = []
-    # Make a (T, L, 2) 3D numpy array where T is the number of csv files and L is the trajectory length.
-    for c in csvs:
-
-        # Read data from csv into pandas dataframe
-        df = pd.read_csv(c, index_col=None, nrows=tl)
-        df1 = df.iloc[-109:-1]
-
-        print('Working on: {}.csv'.format(
-            os.path.basename(os.path.splitext(c)[0])))
+    for csv_file in csvs:
+        print(f'Working on: {os.path.basename(os.path.splitext(csv_file)[0])}.csv')
+        dataframe = pd.read_csv(csv_file, index_col=None, nrows=traj_length)
 
         # Handle data as numpy array
-        num_df = df[cols].values
+        num_df = dataframe[cols].values
 
-        # States
-        s = num_df[:, 0]
-        s = s.reshape(-1, 1)
-        # print('States: \n{}'.format(s))
+        # States (column vector with 1 column)
+        states = num_df[:, 0]
+        states = states.reshape(-1, 1)
 
-        # Actions
-        a = num_df[:, 1]  # - 1
-        a = a.reshape(-1, 1)
-        # print('Actions: \n{}'.format(a))
+        # Actions (column vector with 1 column)
+        actions = num_df[:, 1]
+        actions = actions.reshape(-1, 1)
 
-        # Make s and a into columns and concatenate them
-        traj = np.concatenate((s.reshape(-1, 1), a), axis=1)
+        # Join state and action arrays along horizontal axis as columns.
+        traj = np.concatenate((states, actions), axis=1)
         trajs.append(traj)
 
     # List of trajectories -> 3D numpy array
     trajs = np.stack(trajs)
-
     return trajs
+
 
 def plot_reward_function(df, yticks, save_path, _annot=True):
     """Plot reward function for each state
@@ -177,8 +172,8 @@ def main(args):
 
     # Load and parse json configuration
     config_file = os.path.join(args.input_dir, 'config.json')
-    with open(config_file) as f:
-        cfg = json.load(f)
+    with open(config_file) as file:
+        cfg = json.load(file)
 
     grid = cfg['n_states']
     grid_axes = cfg['n_sub_states']
@@ -187,34 +182,36 @@ def main(args):
     learning_rate = args.learning_rate
     traj_len = args.traj_len
     state_names = cfg['state_names']
+
     if args.l2reg:
         l1, l2 = tuple(args.l2reg)
     else:
         l1 = l2 = 0
 
     # Path where all output data will be stored
-    out_dir = 'DeepMaxEnt_e{}_t{}_g{:03d}_{}'.format(epochs, traj_len, round(100 * discount), tstamp())
+    
+    out_dir = f'DeepMaxEnt_e{epochs}_t{traj_len}_g{discount}_{tstamp()}'
 
     # Read csv logs from input_dir into trajectories
-    csvs = [i for i in glob.glob(os.path.join(args.input_dir, '[!_]*.csv'))]
-    trajectories = read_trajectories(csvs, cfg["df_cols"], tl=traj_len)
+    csvs = list(glob.glob(os.path.join(args.input_dir, '[!_]*.csv')))
+    trajectories = read_trajectories(csvs, cfg["df_cols"], traj_len)
 
     # Load the state transition probabilities
-    tp = np.load(os.path.join(args.input_dir, 'trans_prob.npy'))
+    trans_prob = np.load(os.path.join(args.input_dir, 'trans_prob.npy'))
 
     # Construct a mothworld object
-    mw = neo_mothworld.Mothworld(grid, grid_axes, discount, tp)
+    mothworld = neo_mothworld.MothWorld(grid, grid_axes, discount, trans_prob)
 
     # Initialize the feature matrix
-    feature_matrix = mw.load_feature_map(os.path.join(args.input_dir, '_features.csv'))
-    print('Shape of feature matrix: {}'.format(feature_matrix.shape))
+    feature_matrix = mothworld.load_feature_map(os.path.join(args.input_dir, '_features.csv'))
+    print(f'Shape of feature matrix: {feature_matrix.shape}')
 
     # Extract a reward function using MaxEnt IRL and the moth trajectories
 
     structure = (4, 3)
     print('NN structure: {}; learning rate: {}'.format(structure, learning_rate))
     # Calculating reward
-    r = deep_maxent.irl((feature_matrix.shape[1],) + structure, feature_matrix, mw.n_actions, mw.discount, mw.transition_probability, trajectories, epochs, learning_rate, l1=l1, l2=l2)
+    r = deep_maxent.irl((feature_matrix.shape[1],) + structure, feature_matrix, mothworld.n_actions, mothworld.discount, mothworld.transition_probability, trajectories, epochs, learning_rate, l1=l1, l2=l2)
 
     # Reshape reward
     ex_reward = r.reshape(*grid_axes)
@@ -224,12 +221,12 @@ def main(args):
 
     # Store extracted Q value
     # Calculating policy
-    moth_policy = value_iteration.find_policy(mw.n_states, mw.n_actions,
-                                              mw.transition_probability, r,
+    moth_policy = value_iteration.find_policy(mothworld.n_states, mothworld.n_actions,
+                                              mothworld.transition_probability, r,
                                               discount, threshold=1e-2)
     
-    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mw.n_states)])
-    simple_policy = simple_policy.reshape(mw.substate).T
+    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mothworld.n_states)])
+    simple_policy = simple_policy.reshape(mothworld.substate).T
 
     # Save policy into csv
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
@@ -250,7 +247,7 @@ def main(args):
 
         # Saving policy to h5 and csv
         with h5py.File(os.path.join(tmp_dir, 'policy.h5'), 'w') as hf:
-            hf.create_dataset("policy",  data=moth_policy.reshape(mw.n_actions, *grid_axes))
+            hf.create_dataset("policy",  data=moth_policy.reshape(mothworld.n_actions, *grid_axes))
 
         for i in range(len(moth_policy)):
             pd.DataFrame(moth_policy[i].reshape(grid_axes)).to_csv(
@@ -292,7 +289,7 @@ def main(args):
         plt.show()
 
         fig, ax_q = plt.subplots(
-            1, mw.n_actions, figsize=(12, 6.8), sharey=True)
+            1, mothworld.n_actions, figsize=(12, 6.8), sharey=True)
         cbar_ax = fig.add_axes([.91, .3, .03, .4])
 
         for i, ax in enumerate(ax_q.flat):
