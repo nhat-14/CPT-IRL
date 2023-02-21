@@ -200,18 +200,18 @@ def main(args):
     trans_prob = np.load(os.path.join(args.input_dir, 'trans_prob.npy'))
 
     # Construct a mothworld object
-    mw = neo_mothworld.Mothworld(grid, grid_axes, discount, trans_prob)
+    mothworld = neo_mothworld.MothWorld(grid, grid_axes, discount, trans_prob)
 
     # Initialize the feature matrix
-    feature_matrix = mw.load_feature_map(os.path.join(args.input_dir, '_features.csv'))
-    print('Shape of feature matrix: {}'.format(feature_matrix.shape))
+    feature_matrix = mothworld.load_feature_map(os.path.join(args.input_dir, '_features.csv'))
+    print(f'Shape of feature matrix: {feature_matrix.shape}')
 
     # Extract a reward function using MaxEnt IRL and the moth trajectories
 
     structure = (4, 3)
     print('NN structure: {}; learning rate: {}'.format(structure, learning_rate))
     # Calculating reward
-    r = deep_maxent.irl((feature_matrix.shape[1],) + structure, feature_matrix, mw.n_actions, mw.discount, mw.transition_probability, trajectories, epochs, learning_rate, l1=l1, l2=l2)
+    r = deep_maxent.irl((feature_matrix.shape[1],) + structure, feature_matrix, mothworld.n_actions, mothworld.discount, mothworld.transition_probability, trajectories, epochs, learning_rate, l1=l1, l2=l2)
 
     # Reshape reward
     ex_reward = r.reshape(*grid_axes)
@@ -221,12 +221,12 @@ def main(args):
 
     # Store extracted Q value
     # Calculating policy
-    moth_policy = value_iteration.find_policy(mw.n_states, mw.n_actions,
-                                              mw.transition_probability, r,
+    moth_policy = value_iteration.find_policy(mothworld.n_states, mothworld.n_actions,
+                                              mothworld.transition_probability, r,
                                               discount, threshold=1e-2)
     
-    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mw.n_states)])
-    simple_policy = simple_policy.reshape(mw.substate).T
+    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mothworld.n_states)])
+    simple_policy = simple_policy.reshape(mothworld.substate).T
 
     # Save policy into csv
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
@@ -247,7 +247,7 @@ def main(args):
 
         # Saving policy to h5 and csv
         with h5py.File(os.path.join(tmp_dir, 'policy.h5'), 'w') as hf:
-            hf.create_dataset("policy",  data=moth_policy.reshape(mw.n_actions, *grid_axes))
+            hf.create_dataset("policy",  data=moth_policy.reshape(mothworld.n_actions, *grid_axes))
 
         for i in range(len(moth_policy)):
             pd.DataFrame(moth_policy[i].reshape(grid_axes)).to_csv(
@@ -289,7 +289,7 @@ def main(args):
         plt.show()
 
         fig, ax_q = plt.subplots(
-            1, mw.n_actions, figsize=(12, 6.8), sharey=True)
+            1, mothworld.n_actions, figsize=(12, 6.8), sharey=True)
         cbar_ax = fig.add_axes([.91, .3, .03, .4])
 
         for i, ax in enumerate(ax_q.flat):

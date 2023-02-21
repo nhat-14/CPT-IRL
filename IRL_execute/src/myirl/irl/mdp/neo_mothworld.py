@@ -2,7 +2,7 @@ import numpy as np
 import numpy.random as rn
 import pandas as pd
 
-class Mothworld(object):
+class MothWorld():
     """
     Gridworld MDP.
     """
@@ -14,7 +14,6 @@ class Mothworld(object):
         transition_probability (3D numpy array): state transition probabilities
         -> Gridworld
         """
-
         self.actions = [0, 1, 2, 3]
         self.n_actions = len(self.actions)
         self.n_states = grid_size
@@ -55,7 +54,6 @@ class Mothworld(object):
         return f
 
     def load_feature_map(self, path):
-
         feature_matrix = pd.read_csv(path)
         return feature_matrix.values
     
