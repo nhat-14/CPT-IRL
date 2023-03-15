@@ -178,12 +178,15 @@ def merge_data(input_dir, timeout=0):
     return dfs, lengths
 
 
-def discretize(df, kbins, strat_kmeans=False):
+def discretize(dataframe, kbins, strat_kmeans=False):
+    """ 
+        Bin continuous tblank data into intervals.
+    """
     if strat_kmeans:
         enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal', strategy='kmeans')
     else:
         enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal')
-    enc.fit(df)
+    enc.fit(dataframe)
     km_edges = enc.bin_edges_
-    km_transformed = enc.transform(df)
+    km_transformed = enc.transform(dataframe)
     return km_transformed, km_edges

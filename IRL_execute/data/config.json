@@ -1,7 +1,6 @@
 {
     "n_states": 64,
     "n_sub_states": [16, 4],
-    "df_cols": ["state_i", "action"],
     "n_actions": 4,
     "action_labels": ["stop", "surge", "turn_ccw", "turn_cw"], 
     "draw_subgrid": false,

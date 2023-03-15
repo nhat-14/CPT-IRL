@@ -53,10 +53,7 @@ class MothWorld():
         f[i] = 1
         return f
 
-    def load_feature_map(self, path):
-        feature_matrix = pd.read_csv(path)
-        return feature_matrix.values
-    
+
     def feature_matrix(self, feature_map="ident"):
         """
         Get the feature matrix for this gridworld.

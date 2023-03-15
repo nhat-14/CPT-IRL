@@ -52,12 +52,12 @@ def parse_args(args):
 
 
 def get_expert_demos(df):
-    numeric_states = {0: ['log_tblank', 16, True, True, True]}
+    numeric_states = ['log_tblank', 16, True, True, True]
     # categoric_states = ['antennae', 'wind']
     categoric_states = ['antennae']
-    action_cols = ['linear_vel', 'angular_vel']
 
-    _mdp = mdp.MothMDP(df, numeric_states, categoric_states, action_cols)
+    _mdp = mdp.MothMDP(df, numeric_states, categoric_states)
+
     print("============================================================")
     print(_mdp.df[['linear_vel', 'angular_vel', 'tblank']].describe())
 
@@ -71,10 +71,9 @@ def get_expert_demos(df):
     mdp_edges = pd.DataFrame(
         dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
 
-    # print(mdp_edges / df.Time.iloc[1])
+
+    print("============================================================")
     print(mdp_edges.T)
-    # for i in np.linspace(0.06, .99, 17):
-    # print(_mdp.df.log_tblank.quantile(i))
 
     # fig, ax = plt.subplots(figsize=(16,9))
     # ax = sns.histplot(_mdp.df.log_tblank, bins=16)
@@ -89,7 +88,6 @@ def get_expert_demos(df):
         'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
         'antennae', 'state_num_i', 'state_i', 'action'
     ]].copy()
-    # print(mdp_demos['hit_rate'].describe())
 
     # Normalized value counts per action
     print(_mdp.df['action'].value_counts(normalize=True, sort=False))
@@ -154,16 +152,126 @@ def get_expert_demos(df):
     return mdp_demos, mdp_edges, mdp_tp
 
 
-def main(args):
-    args = parse_args(args)
+def plot_infomation(out_path, plot_type, demos, dataframe):
+    plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))
+    outpath = os.path.join(out_path, 'plots')
+    if plot_type == 'trajectories':
+        plotter.plot_moth_trajectories(dataframe, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_trajectories')
+
+    elif plot_type == 'xy-joint':
+        plotter.plot_moth_xyjoint(dataframe, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_jointplot')
+
+    elif plot_type == 'actions':
+        plotter.plot_actions(
+            demos, 
+            4, 
+            'action', 
+            'Linear vel. (mm/s)',
+            'Angular vel. (rad/s)', 
+            '',
+            ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+            outpath + '_mg')
+        plotter.plt_action_histograms(
+            demos.copy(),
+            'linear_vel',
+            'action',
+            'Linear vel (mm/s)',
+            'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+            bins=32,
+            save_path=outpath + '_linv_v2')
+        plotter.plt_action_histograms(
+            demos.copy(),
+            'angular_vel',
+            'action',
+            'Angular vel (rad/s)',
+            'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+            binrange=[-2*np.pi, 2*np.pi],
+            save_path=outpath + '_angv_v2')
+
+    elif plot_type == 'heatmap':
+        plotter.plot_heatmap(demos, 'state_num_i', 'antennae',
+                                'hits', 'Blank duration',
+                                'Hit antenna', 'Cumulative hits',
+                                outpath + '_mis_DS')
+
+        plotter.plot_heatmap(demos, 'state_num_i', 'antennae', 'wind',
+                                'Blank duration', 'Hit antenna',
+                                'Wind direction', outpath + '_mis_DS')
+
+    elif plot_type == 'kinematics':
+        plotter.kinematics(dataframe,
+                            'tblank', (0, 25), (-np.pi / 2, np.pi / 2),
+                            logscale=True)
+
+    elif plot_type == 'states':
+        plotter.plot_states(demos.copy(), 'log_tblank', 'antennae',
+                            r'$\log(1+\tau_b)$', 'Hit antennae',
+                            ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_logtb_v2')
+        plotter.plot_states(demos.copy(), 'state_num_i', 'antennae',
+                            r'Discretized $\tau_b$', 'Hit antennae',
+                            ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_disc_v2')
+
+    elif plot_type == 'heading':
+        sns.set_style('ticks')
+        sns.set_context('paper')
+        # fig, ax = plt.subplots(figsize=(3.5, 2))
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax = sns.lineplot(x='tblank', y='heading', data=dataframe)
+        # ax.set_xscale('log')
+        # ax.set_ylabel(r'$\cos(\pi - \theta_{moth})$')
+        ax.set_ylabel(r'$\Delta$ heading (deg)')
+        # ax.set_xlabel('Blank duration')
+        ax.set_xlabel('tblank')
+        fig.tight_layout()
+        sns.despine(fig)
+        # ax.set_xlim(0, 2)
+        ax.set_xlim(0, 109 / 30)
+        # ax.set_ylim(-90, 90)
+        plt.savefig('tethered2020-moth-heading-v-tblank', dpi=300)
+        plt.show()
+
+    elif plot_type == 'hit-rate':
+        sns.set_style('ticks')
+        sns.set_context('paper')
+        fig, ax = plt.subplots(figsize=(3.5, 2))
+        ax = sns.lineplot(x='Time', y='hit_rate', data=dataframe)
+        # ax.set_xscale('log')
+        ax.set_ylabel('Hit rate')
+        # ax.set_xlabel('Blank duration')
+        ax.set_xlabel('Time')
+        fig.tight_layout()
+        sns.despine(fig)
+        # ax.set_xlim(0, 2)
+        # plt.savefig('tethered2020-moth-hitrate-v-time', dpi=300)
+        plt.show()
+
+
+def save_excel(input_dir, name, mdp_demos):
+    with pd.ExcelWriter(os.path.join(input_dir, f'{name}_stats.xlsx')) as writer:
+        mdp_demos.describe().to_excel(writer,
+                                float_format="%.4f",
+                                sheet_name='Description')
+        mdp_demos.head(100).to_excel(writer,
+                                float_format="%.4f",
+                                sheet_name='Head')
+        mdp_demos['state_i'].value_counts(normalize=True).to_excel(
+            writer, float_format="%.4f", sheet_name='States')
+        mdp_demos['action'].value_counts(normalize=True).to_excel(
+            writer, float_format="%.4f", sheet_name='Actions')
+
+        
+if __name__ == "__main__":
+    args = parse_args(sys.argv[1:])
     dfs, lengths = preprocessing.merge_data(args.input_dir, timeout=260)
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 
     # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
     # plt.show()
 
-    # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
-    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
+    # features = mdp_demos.groupby('state_i')[
+    #   ['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
+    # features = mdp_demos.groupby('state_i')[
+    #   ['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
     features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
     features['wind'] = features.wind.astype('uint8')
 
@@ -175,125 +283,23 @@ def main(args):
     # features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
-    print('Shape of feature matrix{}'.format(features.shape))
-    out_dir = 'rldemos_{}'.format(fileIO.tstamp())
-    out_path = fileIO.make_dir(args.input_dir, out_dir)
-    np.save(os.path.join(out_path, 'trans_prob.npy'), mdp_tp)
+    print("============================================================")
+    print(f'Shape of feature matrix{features.shape}')
 
-    edges_path = fileIO.make_dir(args.input_dir, out_dir + '/edges')
+    out_dir = f'rldemos_{fileIO.tstamp()}'
+    out_path = fileIO.make_dir(args.input_dir, out_dir)
+
+    # export all the results (bins, features, transittion matrix) into csv files
+    np.save(os.path.join(out_path, 'trans_prob.npy'), mdp_tp)
+    edges_path = fileIO.make_dir(out_path, 'edges')
     mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'), index=False)
     features.to_csv(os.path.join(edges_path, 'features.csv'), index=False)
-    csv_path = fileIO.make_dir(args.input_dir, out_dir)
 
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-        g.to_csv(os.path.join(csv_path, '{0}-{1}.csv'.format(len(g.index), i + 1)), index=False)
+        g.to_csv(os.path.join(out_path, f'{len(g.index)}-{i+1}.csv'), index=False)
 
-    # if args.save_excel:
-    #     with pd.ExcelWriter(os.path.join(args.input_dir, '{}_stats.xlsx'.format(
-    #                 args.save_excel))) as writer:
-    #         mdp_demos.describe().to_excel(writer,
-    #                                 float_format="%.4f",
-    #                                 sheet_name='Description')
-    #         mdp_demos.head(100).to_excel(writer,
-    #                                float_format="%.4f",
-    #                                sheet_name='Head')
-    #         mdp_demos['state_i'].value_counts(normalize=True).to_excel(
-    #             writer, float_format="%.4f", sheet_name='States')
-    #         mdp_demos['action'].value_counts(normalize=True).to_excel(
-    #             writer, float_format="%.4f", sheet_name='Actions')
+    if args.save_excel:
+        save_excel(args.input_dir, args.save_excel, mdp_demos.copy())
 
     if args.plot:
-        plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))
-        outpath = os.path.join(out_path, 'plots')
-        if args.plot == 'trajectories':
-            plotter.plot_moth_trajectories(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_trajectories')
-
-        elif args.plot == 'xy-joint':
-            plotter.plot_moth_xyjoint(dfs, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_jointplot')
-
-        elif args.plot == 'actions':
-            plotter.plot_actions(
-                mdp_demos, 
-                4, 
-                'action', 
-                'Linear vel. (mm/s)',
-                'Angular vel. (rad/s)', 
-                '',
-                ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-                outpath + '_mg')
-            plotter.plt_action_histograms(
-                mdp_demos.copy(),
-                'linear_vel',
-                'action',
-                'Linear vel (mm/s)',
-                'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-                bins=32,
-                save_path=outpath + '_linv_v2')
-            plotter.plt_action_histograms(
-                mdp_demos.copy(),
-                'angular_vel',
-                'action',
-                'Angular vel (rad/s)',
-                'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-                binrange=[-2*np.pi, 2*np.pi],
-                save_path=outpath + '_angv_v2')
-
-        elif args.plot == 'heatmap':
-            plotter.plot_heatmap(mdp_demos, 'state_num_i', 'antennae',
-                                 'hits', 'Blank duration',
-                                 'Hit antenna', 'Cumulative hits',
-                                 outpath + '_mis_DS')
-
-            plotter.plot_heatmap(mdp_demos, 'state_num_i', 'antennae', 'wind',
-                                 'Blank duration', 'Hit antenna',
-                                 'Wind direction', outpath + '_mis_DS')
-
-        elif args.plot == 'kinematics':
-            plotter.kinematics(dfs,
-                               'tblank', (0, 25), (-np.pi / 2, np.pi / 2),
-                               logscale=True)
-
-        elif args.plot == 'states':
-            plotter.plot_states(mdp_demos.copy(), 'log_tblank', 'antennae',
-                                r'$\log(1+\tau_b)$', 'Hit antennae',
-                                ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_logtb_v2')
-            plotter.plot_states(mdp_demos.copy(), 'state_num_i', 'antennae',
-                                r'Discretized $\tau_b$', 'Hit antennae',
-                                ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_disc_v2')
-
-        elif args.plot == 'heading':
-            sns.set_style('ticks')
-            sns.set_context('paper')
-            # fig, ax = plt.subplots(figsize=(3.5, 2))
-            fig, ax = plt.subplots(figsize=(7, 4))
-            ax = sns.lineplot(x='tblank', y='heading', data=dfs)
-            # ax.set_xscale('log')
-            # ax.set_ylabel(r'$\cos(\pi - \theta_{moth})$')
-            ax.set_ylabel(r'$\Delta$ heading (deg)')
-            # ax.set_xlabel('Blank duration')
-            ax.set_xlabel('tblank')
-            fig.tight_layout()
-            sns.despine(fig)
-            # ax.set_xlim(0, 2)
-            ax.set_xlim(0, 109 / 30)
-            # ax.set_ylim(-90, 90)
-            plt.savefig('tethered2020-moth-heading-v-tblank', dpi=300)
-            plt.show()
-
-        elif args.plot == 'hit-rate':
-            sns.set_style('ticks')
-            sns.set_context('paper')
-            fig, ax = plt.subplots(figsize=(3.5, 2))
-            ax = sns.lineplot(x='Time', y='hit_rate', data=dfs)
-            # ax.set_xscale('log')
-            ax.set_ylabel('Hit rate')
-            # ax.set_xlabel('Blank duration')
-            ax.set_xlabel('Time')
-            fig.tight_layout()
-            sns.despine(fig)
-            # ax.set_xlim(0, 2)
-            # plt.savefig('tethered2020-moth-hitrate-v-time', dpi=300)
-            plt.show()
-
-if __name__ == "__main__":
-    main(sys.argv[1:])
+        plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())
