@@ -24,9 +24,6 @@ from myirl.irl import deep_maxent
 
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
-def tstamp(): 
-    return str(datetime.datetime.now().strftime('%m%d_%H%M%S'))
-
 
 def parse_args(args):
     """Parse command line parameters
@@ -105,7 +102,7 @@ def parse_args(args):
     return parser.parse_args(args)
 
 
-def read_trajectories(csvs, cols, traj_length=0):
+def read_trajectories(csvs, traj_length=0):
     """
         Make a (T, L, 2) 3D numpy array where T is the number 
         of csv files and L is the trajectory length.
@@ -118,7 +115,7 @@ def read_trajectories(csvs, cols, traj_length=0):
         dataframe = pd.read_csv(csv_file, index_col=None, nrows=traj_length)
 
         # Handle data as numpy array
-        num_df = dataframe[cols].values
+        num_df = dataframe[["state_i", "action"]].values
 
         # States (column vector with 1 column)
         states = num_df[:, 0]
@@ -189,12 +186,12 @@ def main(args):
         l1 = l2 = 0
 
     # Path where all output data will be stored
-    
-    out_dir = f'DeepMaxEnt_e{epochs}_t{traj_len}_g{discount}_{tstamp()}'
+    time_now = str(datetime.datetime.now().strftime('%m%d_%H%M%S'))
+    out_dir = f'DeepMaxEnt_e{epochs}_t{traj_len}_g{discount}_{time_now}'
 
-    # Read csv logs from input_dir into trajectories
+    # Read csv logs from input_dir into trajectories (of state-action)
     csvs = list(glob.glob(os.path.join(args.input_dir, '[!_]*.csv')))
-    trajectories = read_trajectories(csvs, cfg["df_cols"], traj_len)
+    trajectories = read_trajectories(csvs, traj_len)
 
     # Load the state transition probabilities
     trans_prob = np.load(os.path.join(args.input_dir, 'trans_prob.npy'))
@@ -203,27 +200,38 @@ def main(args):
     mothworld = neo_mothworld.MothWorld(grid, grid_axes, discount, trans_prob)
 
     # Initialize the feature matrix
-    feature_matrix = mothworld.load_feature_map(os.path.join(args.input_dir, '_features.csv'))
+    feature_path = os.path.join(args.input_dir, '_features.csv')
+    feature_matrix = pd.read_csv(feature_path).values
     print(f'Shape of feature matrix: {feature_matrix.shape}')
 
     # Extract a reward function using MaxEnt IRL and the moth trajectories
-
     structure = (4, 3)
-    print('NN structure: {}; learning rate: {}'.format(structure, learning_rate))
+    print(f'NN structure: {structure}; learning rate: {learning_rate}')
+
     # Calculating reward
-    r = deep_maxent.irl((feature_matrix.shape[1],) + structure, feature_matrix, mothworld.n_actions, mothworld.discount, mothworld.transition_probability, trajectories, epochs, learning_rate, l1=l1, l2=l2)
+    r = deep_maxent.irl((feature_matrix.shape[1],) + structure,
+                        feature_matrix,
+                        mothworld.n_actions,
+                        mothworld.discount,
+                        mothworld.transition_probability,
+                        trajectories,
+                        epochs,
+                        learning_rate,
+                        l1=l1,
+                        l2=l2)
 
     # Reshape reward
     ex_reward = r.reshape(*grid_axes)
-    print('Mean reward: {}'.format([
-        round(np.mean(ex_reward[:, i]), 3) for i in range(ex_reward.shape[1])
-    ]))
+    mean_reward = [round(np.mean(ex_reward[:, i]), 3) for i in range(ex_reward.shape[1])]
+    print(f'Mean reward: {mean_reward}')
 
-    # Store extracted Q value
-    # Calculating policy
-    moth_policy = value_iteration.find_policy(mothworld.n_states, mothworld.n_actions,
-                                              mothworld.transition_probability, r,
-                                              discount, threshold=1e-2)
+    # Store extracted Q value and Calculating policy
+    moth_policy = value_iteration.find_policy(mothworld.n_states, 
+                                              mothworld.n_actions,
+                                              mothworld.transition_probability, 
+                                              r,
+                                              discount, 
+                                              threshold=1e-2)
     
     simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mothworld.n_states)])
     simple_policy = simple_policy.reshape(mothworld.substate).T
@@ -231,7 +239,7 @@ def main(args):
     # Save policy into csv
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
     moth_policy = moth_policy.T
-    print('Policy: {}\n{}'.format(moth_policy.shape, moth_policy))
+    print(f'Policy: {moth_policy.shape}\n{moth_policy}')
     action_labels = cfg["action_labels"]
 
     if args.save_csv:

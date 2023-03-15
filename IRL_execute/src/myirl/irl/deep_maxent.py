@@ -193,17 +193,23 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
     """
     Find the reward function for the given trajectories.
 
-    structure: Neural network structure tuple, e.g. (10, 3, 3) would be a
+    structure: 
+        Neural network structure tuple, e.g. (10, 3, 3) would be a
         3-layer neural network with 10 inputs.
-    feature_matrix: Matrix with the nth row representing the nth state. NumPy
+    feature_matrix: 
+        Matrix with the nth row representing the nth state. NumPy
         array with shape (N, D) where N is the number of states and D is the
         dimensionality of the state.
-    n_actions: Number of actions A. int.
-    discount: Discount factor of the MDP. float.
-    transition_probability: NumPy array mapping (state_i, action, state_k) to
+    n_actions: 
+        Number of actions A. int.
+    discount: 
+        Discount factor of the MDP. float.
+    transition_probability: 
+        NumPy array mapping (state_i, action, state_k) to
         the probability of transitioning from state_i to state_k under action.
         Shape (N, A, N).
-    trajectories: 3D array of state/action pairs. States are ints, actions
+    trajectories: 
+        3D array of state/action pairs. States are ints, actions
         are ints. NumPy array with shape (T, L, 2) where T is the number of
         trajectories and L is the trajectory length.
     epochs: Number of gradient descent steps. int.
