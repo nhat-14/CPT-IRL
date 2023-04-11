@@ -28,7 +28,6 @@ class MothMDP(object):
         rtol = 1.e-5
         atol = 1.e-8
         eps = atol + rtol * X
-
         X_d = np.digitize(X + eps, edges[1:])
         X_d = np.clip(X_d, 0, bins - 1)
         return X_d
@@ -36,15 +35,12 @@ class MothMDP(object):
     def digitize_normal_state(self, state):
         states_k = [state.name, state.name + '_k']
         states_digi = [sk + '_digi' for sk in states_k]
-
         x, edges = prep.discretize(self.df[states_k],
                                    state.bins,
                                    strat_kmeans=state.use_kmeans)
-
         edges = edges[0]
         for i, sd in enumerate(states_digi):
             self.df.loc[:, sd] = x[:, i].astype('int')
-
         return edges
 
     def digitize_skewed_state(self, state, _quantile=.98):
@@ -52,7 +48,6 @@ class MothMDP(object):
             The last bin of the digitalize state is define as
             from the quantile(0.98) to the max value
         """
-        # last bin := [quantile(0.98); max value)
         vmax = self.df[state.name].max()
         tail = self.df[state.name] > self.df[state.name].quantile(_quantile)
         vrange = self.df[~tail]
@@ -61,10 +56,7 @@ class MothMDP(object):
         states_k = [state.name, state.name + '_k']
         states_digi = [sk + '_digi' for sk in states_k]
 
-        _, edges = prep.discretize(vrange[states_k],
-            bins,
-            strat_kmeans=state.use_kmeans)
-        
+        _, edges = prep.discretize(vrange[states_k], bins, strat_kmeans=state.use_kmeans)
         edges = np.append(edges[0], vmax)
 
         for i, state_digi in enumerate(states_digi):
@@ -73,7 +65,6 @@ class MothMDP(object):
         if state.logscale:
             edges = np.expm1(edges)
         return edges
-
 
     def digitize_numeric_states(self, state):
         if state.skewed:
@@ -86,7 +77,6 @@ class MothMDP(object):
         else:
             self.digi_edges[state.name] = edges
 
-
     def merge_categoric_states(self):
 
         s0, s1 = tuple(self.categoric_states)
@@ -97,25 +87,19 @@ class MothMDP(object):
         self.df.loc[:, 'state_cat_k'] = self.df[sk0] + self.df[sk1] * b0
 
     def merge_states(self):
-
         ni, nk = ('state_num_i', 'state_num_k')
         ci, ck = ('state_cat_i', 'state_cat_k')
         num_bits = self.num_state_bits
-
         self.df.loc[:, 'state_i'] = self.df[ni] + self.df[ci] * num_bits
         self.df.loc[:, 'state_k'] = self.df[nk] + self.df[ck] * num_bits
 
 
     def encode_states(self):
         state_obj = NumericState(*self.numeric_states)
-
-        # Digitize numeric states
         self.digitize_numeric_states(state_obj)
-        state_name = self.numeric_states[0]
+        state_name = state_obj.name
 
-        print("============================================================")
-        print(f'numeric state: {state_name}')
-        ni, nk = (state_name + '_digi', state_name + '_k_digi')
+        ni, nk = (f'{state_name}_digi', f'{state_name}_k_digi')
         self.df.loc[:, 'state_num_i'] = self.df[ni]
         self.df.loc[:, 'state_num_k'] = self.df[nk]
         self.num_state_bits = self.numeric_states[1]
@@ -139,15 +123,14 @@ class MothMDP(object):
             in each step time in to one of (surge, turn ccw, turn cw, stop)
         """
         lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45), self.df[lin_vel].quantile(0.55))
-        # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        av_lo, av_hi = (self.df['angular_vel'].quantile(0.40), self.df['angular_vel'].quantile(0.60))
-
+        av_lo = self.df['angular_vel'].quantile(0.40)
+        av_hi = self.df['angular_vel'].quantile(0.60)
+        
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
-            av_lo, av_hi, inclusive="both")
+        surge = self.df['linear_vel'].gt(lv_min) \
+            & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
         turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
         turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
@@ -157,39 +140,6 @@ class MothMDP(object):
         self.df['action'].fillna(0, inplace=True)
         self.df['action'] = self.df.action.astype('uint8')
 
-    def encode_many_actions(self, verbose=False):
-        lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45),
-        # self.df[lin_vel].quantile(0.55))
-        # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        # av_lo, av_hi = (-.087, .087)
-        av_lo, av_l, av_h, av_hi = (self.df['angular_vel'].quantile(0.20),
-                                    self.df['angular_vel'].quantile(0.40),
-                                    self.df['angular_vel'].quantile(0.60),
-                                    self.df['angular_vel'].quantile(0.80))
-
-        if verbose:
-
-            print('Min. linear vel. : {:.5f}'.format(lv_min))
-            # print('Linear vel. range: ({:.5f}, {:.5f})'.format(lv_lo, lv_hi))
-            print('Angular vel. range: ({:.5f}, {:.5f})'.format(av_lo, av_hi))
-
-        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
-            av_lo, av_hi, inclusive=True)
-        turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
-        turn_left = ~(surge) & (self.df['angular_vel'].between(
-            av_h, av_hi, inclusive=True))
-        turn_right = ~(surge) & (self.df['angular_vel'].between(
-            av_lo, av_l, inclusive=True))
-        turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
-
-        for i, a in enumerate(
-            [surge, turn_ccw, turn_left, turn_right, turn_cw]):
-            self.df.loc[a, 'action'] = i + 1
-
-        # self.df.loc[stop, 'action'] = 0
-        self.df['action'].fillna(0, inplace=True)
-        self.df['action'] = self.df.action.astype('uint8')
 
     def get_transition_probability(self):
 
@@ -236,12 +186,3 @@ class MothMDP(object):
         self.n_states = n_states
         self.n_actions = n_actions
         return tp
-
-    @property
-    def info(self):
-        msg = f'Numeric states: {self.numeric_states}\n \
-            Categoric states: {self.categoric_states}\n \
-            (u/n) states: {(self.u_states / self.n_states):.5f} \
-            ({self.u_states}/{self.n_states})\n \
-            (u/n) actions: ({self.u_actions}/{self.n_actions})'
-        return msg

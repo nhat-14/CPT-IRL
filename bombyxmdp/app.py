@@ -6,7 +6,6 @@ OUT: Csv files with state-action trajectories
 """
 
 import argparse
-import sys
 import os
 import numpy as np
 import pandas as pd
@@ -17,23 +16,18 @@ import mdp
 import mdp_plots
 import fileIO
 
-sns.set(font="sans-serif", rc={"font.sans-serif": ["DejaVu Sans", "Arial"]})
-
-
 def parse_args(args):
     """Parse command line parameters
     Args: args ([str]): command line parameters as list of strings
     Returns: obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p",
-        "--plot",
+    parser.add_argument("-p", "--plot",
         dest="plot",
         help='Plot reward and action-value function',
         nargs='?',
         const='plot.png')
-    parser.add_argument("-i",
-        "--input-dir",
+    parser.add_argument("-i", "--input-dir",
         type=str,
         dest="input_dir",
         help='Path of the directory with the input data',
@@ -63,9 +57,6 @@ def get_expert_demos(df):
 
     _mdp.encode_states()
     _mdp.encode_actions()
-    # _mdp.encode_many_actions(verbose=True)
-    # Min. linear vel. : 3.99180
-    # Angular vel. range: (-0.11700, 0.35100)
 
     mdp_tp = _mdp.get_transition_probability()
     mdp_edges = pd.DataFrame(
@@ -75,20 +66,13 @@ def get_expert_demos(df):
     print("============================================================")
     print(mdp_edges.T)
 
-    # fig, ax = plt.subplots(figsize=(16,9))
-    # ax = sns.histplot(_mdp.df.log_tblank, bins=16)
-    # ax.plot(np.log1p(mdp_edges))
-    # plt.show()
     # mdp_demos = _mdp.df[[
-    #     'Time', 'linear_vel', 'angular_vel', 'state_i', 'action'
+    #     'Time', 'x_mm', 'y_mm', 'linear_vel', 'angular_vel', 
+    #     'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
+    #     'antennae', 'state_num_i', 'state_i', 'action'
     # ]].copy()
 
-    mdp_demos = _mdp.df[[
-        'Time', 'x_mm', 'y_mm', 'linear_vel', 'angular_vel', 
-        'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
-        'antennae', 'state_num_i', 'state_i', 'action'
-    ]].copy()
-
+    mdp_demos = _mdp.df.copy()
     # Normalized value counts per action
     print(_mdp.df['action'].value_counts(normalize=True, sort=False))
     # print()
@@ -124,8 +108,6 @@ def get_expert_demos(df):
 
     # plt.scatter(mdp_edges.to_numpy()[:,0], np.zeros(len(mdp_edges)))
     # plt.show()
-
-    print(_mdp.info)
 
     # print(_mdp.df['tortuosity'].describe())
 
@@ -259,14 +241,10 @@ def save_excel(input_dir, name, mdp_demos):
         mdp_demos['action'].value_counts(normalize=True).to_excel(
             writer, float_format="%.4f", sheet_name='Actions')
 
-        
-if __name__ == "__main__":
-    args = parse_args(sys.argv[1:])
-    dfs, lengths = preprocessing.merge_data(args.input_dir, timeout=260)
-    mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 
-    # sns.histplot(data=mdp_demos, x='angular_vel', kde=True, stat='density')
-    # plt.show()
+if __name__ == "__main__":
+    dfs, lengths = preprocessing.merge_data(timeout=260)
+    mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 
     # features = mdp_demos.groupby('state_i')[
     #   ['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
@@ -283,23 +261,21 @@ if __name__ == "__main__":
     # features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
-    print("============================================================")
-    print(f'Shape of feature matrix{features.shape}')
-
-    out_dir = f'rldemos_{fileIO.tstamp()}'
-    out_path = fileIO.make_dir(args.input_dir, out_dir)
+    basepath = os.getcwd()
+    out_dir = os.path.join(basepath, f'rldemos_{fileIO.tstamp()}')
+    os.mkdir(out_dir)
 
     # export all the results (bins, features, transittion matrix) into csv files
-    np.save(os.path.join(out_path, 'trans_prob.npy'), mdp_tp)
-    edges_path = fileIO.make_dir(out_path, 'edges')
-    mdp_edges.to_csv(os.path.join(edges_path, 'bin_edges.csv'), index=False)
-    features.to_csv(os.path.join(edges_path, 'features.csv'), index=False)
+    np.save((os.path.join(out_dir, 'trans_prob.npy')), mdp_tp)
+    mdp_edges.to_csv((os.path.join(out_dir, 'bin_edges.csv')), index=False)
+    features.to_csv((os.path.join(out_dir, 'features.csv')), index=False)
+    dfs.to_csv((os.path.join(out_dir, 'output.csv')), index=False)
 
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-        g.to_csv(os.path.join(out_path, f'{len(g.index)}-{i+1}.csv'), index=False)
+        g.to_csv(os.path.join(out_dir, f'{len(g.index)}-{i+1}.csv'), index=False)
 
-    if args.save_excel:
-        save_excel(args.input_dir, args.save_excel, mdp_demos.copy())
+    # # if args.save_excel:
+    # #     save_excel(input_dir, args.save_excel, mdp_demos.copy())
 
-    if args.plot:
-        plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())
+    # # if args.plot:
+    # #     plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())

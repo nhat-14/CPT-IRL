@@ -44,7 +44,7 @@ docs/api/*
 docs/_rst/*
 docs/_build/*
 cover/*
-bombyxmdp/data/trajectories/rldemos*
+bombyxmdp/rldemos*
 IRL_execute/data/DeepMaxEnt*
 MANIFEST
 

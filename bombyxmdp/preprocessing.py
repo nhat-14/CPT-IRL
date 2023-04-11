@@ -72,10 +72,12 @@ def resample_data(df, dt, tl):
     return rescaled_df
 
 
-def merge_data(input_dir, timeout=0):
+def merge_data(timeout=0):
     """
         Calculate linear and angular velocity from trajectories and timestamp
     """
+    basepath = os.getcwd()
+    input_dir = os.path.join(basepath, "data")
     csvs = list(glob.glob(os.path.join(input_dir, '*.csv')))
     dfs = []
     lengths = []
@@ -158,29 +160,26 @@ def merge_data(input_dir, timeout=0):
         df['wind_k'] = df.loc[:, 'wind'].shift(-1, fill_value=0)
 
         # Add column with experiment name
-        experiment_id = os.path.basename(os.path.splitext(csvfile)[0])
-        df['experiment'] = experiment_id
+        df['experiment'] = os.path.basename(csvfile)
 
         if (np.sqrt(df['x_mm'].iloc[-1]**2 + df['y_mm'].iloc[-1]**2) <= 50):
             success_runs += 1
 
-        if timeout > 0:
-            if df['Time'].iloc[-1] <= timeout:
-                dfs.append(df)
-                lengths.append(len(df.index))
-        else:
+        # only use the data which is recorded within the timeout
+        if df['Time'].iloc[-1] <= timeout:
             dfs.append(df)
+            lengths.append(len(df.index))
+
 
     dfs = pd.concat(dfs, axis=0, ignore_index=True)
 
-    print(f'Successful runs: ({success_runs}/{len(csvs)})')
-    print(f'Average trajectory length: {pd.Series(lengths).describe().T}')
+    print(f'Successful runs: {success_runs}/{len(csvs)}')
     return dfs, lengths
 
 
 def discretize(dataframe, kbins, strat_kmeans=False):
     """ 
-        Bin continuous tblank data into intervals.
+    Bin continuous tblank data into intervals.
     """
     if strat_kmeans:
         enc = KBinsDiscretizer(n_bins=kbins, encode='ordinal', strategy='kmeans')
