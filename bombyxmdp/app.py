@@ -59,8 +59,7 @@ def get_expert_demos(df):
     _mdp.encode_actions()
 
     mdp_tp = _mdp.get_transition_probability()
-    mdp_edges = pd.DataFrame(
-        dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
+    mdp_edges = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
 
 
     print("============================================================")
@@ -243,6 +242,12 @@ def save_excel(input_dir, name, mdp_demos):
 
 
 if __name__ == "__main__":
+    formatType = "{:.2f}".format
+    pd.options.display.float_format = formatType
+    np.set_printoptions(formatter={'float_kind':formatType})
+
+
+
     dfs, lengths = preprocessing.merge_data(timeout=260)
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 

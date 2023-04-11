@@ -18,10 +18,6 @@ class MothMDP(object):
         self.categoric_states = categoric_states
         self.num_state_bits = 0
         self.digi_edges = {}
-        self.n_states = 0
-        self.n_actions = 0
-        self.u_states = 0
-        self.u_actions = 0
 
     def _digitize(self, X, edges):
         bins = len(edges) - 1
@@ -93,24 +89,21 @@ class MothMDP(object):
         self.df.loc[:, 'state_i'] = self.df[ni] + self.df[ci] * num_bits
         self.df.loc[:, 'state_k'] = self.df[nk] + self.df[ck] * num_bits
 
-
     def encode_states(self):
         state_obj = NumericState(*self.numeric_states)
         self.digitize_numeric_states(state_obj)
         state_name = state_obj.name
-
         ni, nk = (f'{state_name}_digi', f'{state_name}_k_digi')
         self.df.loc[:, 'state_num_i'] = self.df[ni]
         self.df.loc[:, 'state_num_k'] = self.df[nk]
-        self.num_state_bits = self.numeric_states[1]
+        self.num_state_bits = state_obj.bins
 
         if len(self.categoric_states) > 1:
             # Merge categoric states
             self.merge_categoric_states()
-
         else:
-            ci, ck = (self.categoric_states[0],
-                      self.categoric_states[0] + '_k')
+            state = self.categoric_states[0]
+            ci, ck = (state, f'{state}_k')
             self.df.loc[:, 'state_cat_i'] = self.df[ci]
             self.df.loc[:, 'state_cat_k'] = self.df[ck]
 
@@ -140,49 +133,39 @@ class MothMDP(object):
         self.df['action'].fillna(0, inplace=True)
         self.df['action'] = self.df.action.astype('uint8')
 
-
     def get_transition_probability(self):
-
-        t_ik = self.df.groupby(['state_i', 'action',
-                                'state_k']).state_k.count()
+        t_ik = self.df.groupby(['state_i', 'action','state_k'])
+        t_ik = t_ik.state_k.count()
 
         n_states = len(self.df['state_cat_i'].unique()) * self.num_state_bits
         n_actions = len(t_ik.index.levels[1])
 
-        _u_states = t_ik.index.levels[0].values
-        _u_actions = t_ik.index.levels[1].values
-
-        u_states = len(_u_states)
-        u_actions = len(_u_actions)
-
         # Create an array of levels for all possible transitions
-        lvl = [
-            t_ik.index.levels[0].values, t_ik.index.levels[1].values,
-            range(u_states)
-        ]
+        lvl = [range(n_states), range(n_actions), range(n_states)]
         new_index = pd.MultiIndex.from_product(lvl, names=t_ik.index.names)
 
         # Reindex the count and fill empty values with zero (NaN by default)
         t_ik = t_ik.reindex(new_index, fill_value=0)
 
         # Create a transition probability matrix
-        t_ik = np.array(t_ik,
-                        dtype=np.float64).reshape(u_states, u_actions,
-                                                  u_states)
+        t_ik = np.array(t_ik, dtype=np.float64)
+        tp = t_ik.reshape(n_states, n_actions, n_states)
 
-        tp = np.zeros((n_states, n_actions, n_states))
-        tp[:u_states, :, :u_states] = t_ik
-
-        # Normalize transition probability matrix for each action
+        # Normalize transition probability matrix for each (s,a)
         for i in range(tp.shape[0]):
             for j in range(tp.shape[1]):
-                tp[i, j] /= np.sum(tp[i, j])
+                denom = np.sum(tp[i, j])
+                tp[i, j] = tp[i, j] / denom if denom else 0
 
-        tp = np.nan_to_num(tp)
-        print('Sum of tp[0]: {}'.format(np.sum(tp[0])))
 
-        self.u_states = u_states
-        self.u_actions = u_actions
-        self.n_states = n_states
-        self.n_actions = n_actions
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        M = tp
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x,y,z = np.meshgrid(range(n_states), range(n_actions), range(n_states))
+        ax.scatter(x,y,z, c=M.flat)
+        plt.show()
+
         return tp
