@@ -5,7 +5,6 @@ IN: path of directory containing log files (csv format)
 OUT: Csv files with state-action trajectories
 """
 
-import argparse
 import os
 import numpy as np
 import pandas as pd
@@ -15,35 +14,7 @@ import preprocessing
 import mdp
 import mdp_plots
 import fileIO
-
-def parse_args(args):
-    """Parse command line parameters
-    Args: args ([str]): command line parameters as list of strings
-    Returns: obj:`argparse.Namespace`: command line parameters namespace
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--plot",
-        dest="plot",
-        help='Plot reward and action-value function',
-        nargs='?',
-        const='plot.png')
-    parser.add_argument("-i", "--input-dir",
-        type=str,
-        dest="input_dir",
-        help='Path of the directory with the input data',
-        required=True)
-    parser.add_argument("--save-excel",
-        dest="save_excel",
-        help='Save descriptive stats to xlsx',
-        nargs="?",
-        const='summary')
-    parser.add_argument("--save-csv",
-        dest="save_csv",
-        help='Save merged dataframe to csv',
-        nargs='?',
-        const='rldemos')
-    return parser.parse_args(args)
-
+from os.path import join
 
 def get_expert_demos(df):
     numeric_states = ['log_tblank', 16, True, True, True]
@@ -246,41 +217,34 @@ if __name__ == "__main__":
     pd.options.display.float_format = formatType
     np.set_printoptions(formatter={'float_kind':formatType})
 
-
-
     dfs, lengths = preprocessing.merge_data(timeout=260)
     mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
 
-    # features = mdp_demos.groupby('state_i')[
-    #   ['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
-    # features = mdp_demos.groupby('state_i')[
-    #   ['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
-    features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
+    # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
+    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
+    features = mdp_demos.groupby('state_i')[['wind', 'hit_hz']].median()
     features['wind'] = features.wind.astype('uint8')
+    features['hit_hz'] = features.hit_hz.astype('uint8')
 
-    phi = np.zeros((mdp_tp.shape[0], 2))
-    phi[np.array(features.index)] = features.to_numpy()
-    features = pd.DataFrame(phi)
-
-    # print('Unique values of hit rate: {}'.format(len(features['hit_rate'].unique())))
+    # print(f'Unique values of hit rate: {len(features['hit_rate'].unique())}')
     # features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
     basepath = os.getcwd()
-    out_dir = os.path.join(basepath, f'rldemos_{fileIO.tstamp()}')
+    out_dir = join(basepath, f'rldemos_{fileIO.tstamp()}')
     os.mkdir(out_dir)
 
     # export all the results (bins, features, transittion matrix) into csv files
-    np.save((os.path.join(out_dir, 'trans_prob.npy')), mdp_tp)
-    mdp_edges.to_csv((os.path.join(out_dir, 'bin_edges.csv')), index=False)
-    features.to_csv((os.path.join(out_dir, 'features.csv')), index=False)
-    dfs.to_csv((os.path.join(out_dir, 'output.csv')), index=False)
+    np.save((join(out_dir, 'trans_prob.npy')), mdp_tp)
+    mdp_edges.to_csv((join(out_dir, 'bin_edges.csv')), index=False)
+    features.to_csv((join(out_dir, 'features.csv')), index=False)
+    dfs.to_csv((join(out_dir, 'summary.csv')), index=False)
 
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-        g.to_csv(os.path.join(out_dir, f'{len(g.index)}-{i+1}.csv'), index=False)
-
-    # # if args.save_excel:
-    # #     save_excel(input_dir, args.save_excel, mdp_demos.copy())
+        g.to_csv(join(out_dir, f'{len(g.index)}-{i+1}.csv'), index=False)
 
     # # if args.plot:
     # #     plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())
+
+
+  

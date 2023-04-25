@@ -107,6 +107,12 @@ def merge_data(timeout=0):
         df['cdv'] = centerline_deviation(df['y_mm'], tstep)
         df['heading'] = np.cos(np.pi - df['theta_rad'])
 
+        #######################################################
+        hit_dict = {'N': 0, 'R': 1, 'L': 1, 'B': 1}
+        df['hit_hz'] = df['antennae'].map(hit_dict)
+        df['hit_hz']= df['hit_hz'].rolling(min_periods=1, window=30).sum()
+        #######################################################
+
         # Remap values of odor and wind cues to numeric values
         antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
         df['antennae'] = df['antennae'].map(antennae_dict)
