@@ -18,17 +18,12 @@ class MothMDP(object):
         self.categoric_states = categoric_states
         self.num_state_bits = 0
         self.digi_edges = {}
-        self.n_states = 0
-        self.n_actions = 0
-        self.u_states = 0
-        self.u_actions = 0
 
     def _digitize(self, X, edges):
         bins = len(edges) - 1
         rtol = 1.e-5
         atol = 1.e-8
         eps = atol + rtol * X
-
         X_d = np.digitize(X + eps, edges[1:])
         X_d = np.clip(X_d, 0, bins - 1)
         return X_d
@@ -36,15 +31,12 @@ class MothMDP(object):
     def digitize_normal_state(self, state):
         states_k = [state.name, state.name + '_k']
         states_digi = [sk + '_digi' for sk in states_k]
-
         x, edges = prep.discretize(self.df[states_k],
                                    state.bins,
                                    strat_kmeans=state.use_kmeans)
-
         edges = edges[0]
         for i, sd in enumerate(states_digi):
             self.df.loc[:, sd] = x[:, i].astype('int')
-
         return edges
 
     def digitize_skewed_state(self, state, _quantile=.98):
@@ -52,7 +44,6 @@ class MothMDP(object):
             The last bin of the digitalize state is define as
             from the quantile(0.98) to the max value
         """
-        # last bin := [quantile(0.98); max value)
         vmax = self.df[state.name].max()
         tail = self.df[state.name] > self.df[state.name].quantile(_quantile)
         vrange = self.df[~tail]
@@ -61,10 +52,7 @@ class MothMDP(object):
         states_k = [state.name, state.name + '_k']
         states_digi = [sk + '_digi' for sk in states_k]
 
-        _, edges = prep.discretize(vrange[states_k],
-            bins,
-            strat_kmeans=state.use_kmeans)
-        
+        _, edges = prep.discretize(vrange[states_k], bins, strat_kmeans=state.use_kmeans)
         edges = np.append(edges[0], vmax)
 
         for i, state_digi in enumerate(states_digi):
@@ -73,7 +61,6 @@ class MothMDP(object):
         if state.logscale:
             edges = np.expm1(edges)
         return edges
-
 
     def digitize_numeric_states(self, state):
         if state.skewed:
@@ -86,7 +73,6 @@ class MothMDP(object):
         else:
             self.digi_edges[state.name] = edges
 
-
     def merge_categoric_states(self):
 
         s0, s1 = tuple(self.categoric_states)
@@ -97,36 +83,27 @@ class MothMDP(object):
         self.df.loc[:, 'state_cat_k'] = self.df[sk0] + self.df[sk1] * b0
 
     def merge_states(self):
-
         ni, nk = ('state_num_i', 'state_num_k')
         ci, ck = ('state_cat_i', 'state_cat_k')
         num_bits = self.num_state_bits
-
         self.df.loc[:, 'state_i'] = self.df[ni] + self.df[ci] * num_bits
         self.df.loc[:, 'state_k'] = self.df[nk] + self.df[ck] * num_bits
 
-
     def encode_states(self):
         state_obj = NumericState(*self.numeric_states)
-
-        # Digitize numeric states
         self.digitize_numeric_states(state_obj)
-        state_name = self.numeric_states[0]
-
-        print("============================================================")
-        print(f'numeric state: {state_name}')
-        ni, nk = (state_name + '_digi', state_name + '_k_digi')
+        state_name = state_obj.name
+        ni, nk = (f'{state_name}_digi', f'{state_name}_k_digi')
         self.df.loc[:, 'state_num_i'] = self.df[ni]
         self.df.loc[:, 'state_num_k'] = self.df[nk]
-        self.num_state_bits = self.numeric_states[1]
+        self.num_state_bits = state_obj.bins
 
         if len(self.categoric_states) > 1:
             # Merge categoric states
             self.merge_categoric_states()
-
         else:
-            ci, ck = (self.categoric_states[0],
-                      self.categoric_states[0] + '_k')
+            state = self.categoric_states[0]
+            ci, ck = (state, f'{state}_k')
             self.df.loc[:, 'state_cat_i'] = self.df[ci]
             self.df.loc[:, 'state_cat_k'] = self.df[ck]
 
@@ -139,15 +116,14 @@ class MothMDP(object):
             in each step time in to one of (surge, turn ccw, turn cw, stop)
         """
         lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45), self.df[lin_vel].quantile(0.55))
-        # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        av_lo, av_hi = (self.df['angular_vel'].quantile(0.40), self.df['angular_vel'].quantile(0.60))
-
+        av_lo = self.df['angular_vel'].quantile(0.40)
+        av_hi = self.df['angular_vel'].quantile(0.60)
+        
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
-            av_lo, av_hi, inclusive="both")
+        surge = self.df['linear_vel'].gt(lv_min) \
+            & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
         turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
         turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
@@ -157,91 +133,39 @@ class MothMDP(object):
         self.df['action'].fillna(0, inplace=True)
         self.df['action'] = self.df.action.astype('uint8')
 
-    def encode_many_actions(self, verbose=False):
-        lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        # lv_lo, lv_hi = (self.df[lin_vel].quantile(0.45),
-        # self.df[lin_vel].quantile(0.55))
-        # av_lo, av_hi = (-self.df[ang_vel].mean(), self.df[ang_vel].mean())
-        # av_lo, av_hi = (-.087, .087)
-        av_lo, av_l, av_h, av_hi = (self.df['angular_vel'].quantile(0.20),
-                                    self.df['angular_vel'].quantile(0.40),
-                                    self.df['angular_vel'].quantile(0.60),
-                                    self.df['angular_vel'].quantile(0.80))
-
-        if verbose:
-
-            print('Min. linear vel. : {:.5f}'.format(lv_min))
-            # print('Linear vel. range: ({:.5f}, {:.5f})'.format(lv_lo, lv_hi))
-            print('Angular vel. range: ({:.5f}, {:.5f})'.format(av_lo, av_hi))
-
-        surge = self.df['linear_vel'].gt(lv_min) & self.df['angular_vel'].between(
-            av_lo, av_hi, inclusive=True)
-        turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
-        turn_left = ~(surge) & (self.df['angular_vel'].between(
-            av_h, av_hi, inclusive=True))
-        turn_right = ~(surge) & (self.df['angular_vel'].between(
-            av_lo, av_l, inclusive=True))
-        turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
-
-        for i, a in enumerate(
-            [surge, turn_ccw, turn_left, turn_right, turn_cw]):
-            self.df.loc[a, 'action'] = i + 1
-
-        # self.df.loc[stop, 'action'] = 0
-        self.df['action'].fillna(0, inplace=True)
-        self.df['action'] = self.df.action.astype('uint8')
-
     def get_transition_probability(self):
-
-        t_ik = self.df.groupby(['state_i', 'action',
-                                'state_k']).state_k.count()
+        t_ik = self.df.groupby(['state_i', 'action','state_k'])
+        t_ik = t_ik.state_k.count()
 
         n_states = len(self.df['state_cat_i'].unique()) * self.num_state_bits
         n_actions = len(t_ik.index.levels[1])
 
-        _u_states = t_ik.index.levels[0].values
-        _u_actions = t_ik.index.levels[1].values
-
-        u_states = len(_u_states)
-        u_actions = len(_u_actions)
-
         # Create an array of levels for all possible transitions
-        lvl = [
-            t_ik.index.levels[0].values, t_ik.index.levels[1].values,
-            range(u_states)
-        ]
+        lvl = [range(n_states), range(n_actions), range(n_states)]
         new_index = pd.MultiIndex.from_product(lvl, names=t_ik.index.names)
 
         # Reindex the count and fill empty values with zero (NaN by default)
         t_ik = t_ik.reindex(new_index, fill_value=0)
 
         # Create a transition probability matrix
-        t_ik = np.array(t_ik,
-                        dtype=np.float64).reshape(u_states, u_actions,
-                                                  u_states)
+        t_ik = np.array(t_ik, dtype=np.float64)
+        tp = t_ik.reshape(n_states, n_actions, n_states)
 
-        tp = np.zeros((n_states, n_actions, n_states))
-        tp[:u_states, :, :u_states] = t_ik
-
-        # Normalize transition probability matrix for each action
+        # Normalize transition probability matrix for each (s,a)
         for i in range(tp.shape[0]):
             for j in range(tp.shape[1]):
-                tp[i, j] /= np.sum(tp[i, j])
+                denom = np.sum(tp[i, j])
+                tp[i, j] = tp[i, j] / denom if denom else 0
 
-        tp = np.nan_to_num(tp)
-        print('Sum of tp[0]: {}'.format(np.sum(tp[0])))
 
-        self.u_states = u_states
-        self.u_actions = u_actions
-        self.n_states = n_states
-        self.n_actions = n_actions
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        M = tp
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x,y,z = np.meshgrid(range(n_states), range(n_actions), range(n_states))
+        ax.scatter(x,y,z, c=M.flat)
+        plt.show()
+
         return tp
-
-    @property
-    def info(self):
-        msg = f'Numeric states: {self.numeric_states}\n \
-            Categoric states: {self.categoric_states}\n \
-            (u/n) states: {(self.u_states / self.n_states):.5f} \
-            ({self.u_states}/{self.n_states})\n \
-            (u/n) actions: ({self.u_actions}/{self.n_actions})'
-        return msg

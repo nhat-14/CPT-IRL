@@ -20,10 +20,10 @@ optional arguments:
 
 ### Example
 
-- Having a folder named data/trajectories/ with a .csv files, run the following command:
+- Having a folder named data/ with a .csv files, run the following command:
 
 ```console
-python app.py -i data/trajectories/ --save-csv --plot
+python app.py -i data/ --save-csv --plot
 ```
 
 The above command will create the following items:
