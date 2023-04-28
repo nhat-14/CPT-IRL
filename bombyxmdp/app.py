@@ -6,6 +6,7 @@ OUT: Csv files with state-action trajectories
 """
 
 import os
+import datetime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,8 +14,15 @@ import seaborn as sns
 import preprocessing
 import mdp
 import mdp_plots
-import fileIO
 from os.path import join
+
+
+def get_tstamp():
+    """
+    Return current time in date and time
+    """
+    return str(datetime.datetime.now().strftime('%m%d_%H%M%S'))
+
 
 def get_expert_demos(df):
     numeric_states = ['log_tblank', 16, True, True, True]
@@ -29,7 +37,7 @@ def get_expert_demos(df):
     _mdp.encode_states()
     _mdp.encode_actions()
 
-    mdp_tp = _mdp.get_transition_probability()
+    transition_prob = _mdp.get_transition_probability()
     mdp_edges = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
 
 
@@ -81,7 +89,7 @@ def get_expert_demos(df):
 
     # print(_mdp.df['tortuosity'].describe())
 
-    # sns.heatmap(mdp_tp[:, 1, :])
+    # sns.heatmap(transition_prob[:, 1, :])
     # sns.set_style('ticks')
     # sns.set_context('paper')
     # fig, ax = plt.subplots(figsize=(7, 4))
@@ -101,7 +109,7 @@ def get_expert_demos(df):
     # sns.histplot(_mdp.df.log_tblank, ax=axs[1], bins=32, kde=True)
     # plt.show()
 
-    return mdp_demos, mdp_edges, mdp_tp
+    return mdp_demos, mdp_edges, transition_prob
 
 
 def plot_infomation(out_path, plot_type, demos, dataframe):
@@ -213,38 +221,27 @@ def save_excel(input_dir, name, mdp_demos):
 
 
 if __name__ == "__main__":
-    formatType = "{:.2f}".format
-    pd.options.display.float_format = formatType
-    np.set_printoptions(formatter={'float_kind':formatType})
-
-    dfs, lengths = preprocessing.merge_data(timeout=260)
-    mdp_demos, mdp_edges, mdp_tp = get_expert_demos(dfs.copy())
+    dfs = preprocessing.merge_data(timeout=260)
+    mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())
 
     # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
     # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
-    features = mdp_demos.groupby('state_i')[['wind', 'hit_hz']].median()
+    features = mdp_demos.groupby('state_i')[['wind', 'hit_rate']].median()
     features['wind'] = features.wind.astype('uint8')
-    features['hit_hz'] = features.hit_hz.astype('uint8')
-
-    # print(f'Unique values of hit rate: {len(features['hit_rate'].unique())}')
-    # features['hit_rate'] = features.hit_rate.astype('uint8')
+    features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
     basepath = os.getcwd()
-    out_dir = join(basepath, f'rldemos_{fileIO.tstamp()}')
+    out_dir = join(basepath, f'rldemos_{get_tstamp()}')
     os.mkdir(out_dir)
 
     # export all the results (bins, features, transittion matrix) into csv files
-    np.save((join(out_dir, 'trans_prob.npy')), mdp_tp)
+    np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
     mdp_edges.to_csv((join(out_dir, 'bin_edges.csv')), index=False)
     features.to_csv((join(out_dir, 'features.csv')), index=False)
-    dfs.to_csv((join(out_dir, 'summary.csv')), index=False)
 
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
         g.to_csv(join(out_dir, f'{len(g.index)}-{i+1}.csv'), index=False)
 
     # # if args.plot:
-    # #     plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())
-
-
-  
+    # #     plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())  
