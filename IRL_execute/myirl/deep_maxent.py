@@ -13,15 +13,13 @@ import numpy as np
 import numpy.random as rn
 import theano as th
 import theano.tensor as T
-
-from . import maxent
 from tqdm import tqdm
 
 FLOAT = th.config.floatX
 
 def find_svf(n_states, trajectories):
     """
-    Find the state vistiation frequency from trajectories.
+    Find the state visitation frequency from trajectories.
 
     n_states: Number of states. int.
     trajectories: 3D array of state/action pairs. States are ints, actions
@@ -38,7 +36,8 @@ def find_svf(n_states, trajectories):
 
     svf /= trajectories.shape[0]
 
-    return th.shared(svf, "svf", borrow=True)
+    return svf
+
 
 def optimal_value(n_states, n_actions, transition_probabilities, reward,
                   discount, threshold=1e-2):
@@ -93,6 +92,7 @@ def optimal_value(n_states, n_actions, transition_probabilities, reward,
 
     return vs[-1]
 
+
 def find_policy(n_states, n_actions, transition_probabilities, reward, discount,
                 threshold=1e-3, v=None):
     """
@@ -131,6 +131,7 @@ def find_policy(n_states, n_actions, transition_probabilities, reward, discount,
     Q -= Q.max(axis=1).reshape((n_states, 1))  # For numerical stability.
     Q = T.exp(Q)/T.exp(Q).sum(axis=1).reshape((n_states, 1))
     return Q
+
 
 def find_expected_svf(n_states, r, n_actions, discount,
                       transition_probability, trajectories):
@@ -186,6 +187,7 @@ def find_expected_svf(n_states, r, n_actions, discount,
                                  action_range])
 
     return svf.sum(axis=0) + p_start_state
+
 
 def irl(structure, feature_matrix, n_actions, discount, transition_probability,
         trajectories, epochs, learning_rate, initialisation="normal", l1=0.1,
@@ -284,7 +286,7 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
                                      n_actions, discount,
                                      transition_probability,
                                      trajectories)
-    svf = maxent.find_svf(n_states, trajectories.get_value())
+    svf = find_svf(n_states, trajectories.get_value())
     # Derivatives (backward propagation).
     updates = []
     α_grad = φs[-1].dot(svf - expected_svf).T

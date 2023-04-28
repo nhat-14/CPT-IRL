@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 This file estimates the reward function of a silkmoth based on Deep 
 Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
@@ -165,10 +163,9 @@ def save_csv():
 
 
 if __name__ == "__main__":
+    # Load and parse json configuration
     basepath = os.getcwd()
     input_dir = join(basepath, "data")
-
-    # Load and parse json configuration
     config_file = join(input_dir, 'config.json')
     with open(config_file, encoding='UTF-8') as file:
         cfg = json.load(file)
@@ -245,6 +242,5 @@ if __name__ == "__main__":
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
     moth_policy = moth_policy.T
     print(f'Policy: {moth_policy.shape}\n{moth_policy}')
-    
     save_csv()
     plot_policy()
