@@ -19,41 +19,7 @@ class MdpPlots(object):
         self.dpi = dpi
         self.tight = tight
 
-    # Plot all the moth trajectories
-    def plot_moth_trajectories(self, df, xlim, ylim, src=(0, 0, 50), output=None):
-        srcx, srcy, goal_radius = src
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        fig, ax = plt.subplots(figsize=(3.4, 2.83))
-
-        ax.add_artist(Circle((srcx, srcy), goal_radius, color='r', 
-            fill=False, linestyle='--', linewidth=0.5, zorder=1))
-
-        for i, g in df.groupby((df.Time.diff() < 0).cumsum()):
-            ax.plot(g.x_mm, g.y_mm, linewidth=.2, alpha=0.5, color='k', zorder=3)
-            ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1], color='g', s=5)
-
-        ax.scatter(srcx, srcy, marker='*', c='k')
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-        ax.set_xlabel('x (mm)')
-        ax.set_ylabel('y (mm)')
-        ax.set_aspect('equal')
-        fig.tight_layout()
-
-        plt.savefig(output, dpi=300)
-        plt.show()
-
-    def plot_moth_xyjoint(self, df, xlim, ylim, src=(0, 0, 50), output=None):
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        fig, ax = plt.subplots(figsize=(3.4, 2.83))
-        ax = sns.jointplot(x='x_mm', y='y_mm',
-                           data=df, kind='kde',
-                           xlim=(0, 600), ylim=(-360, 360))
-        fig.tight_layout()
-        plt.savefig(output, dpi=300)
-        # plt.show()
+    
 
     def plot_sim_xyjoint(self, _path, xlim, ylim, src=(0, 0, 50), N=0, output=None):
 
@@ -357,51 +323,7 @@ class MdpPlots(object):
             plt.savefig(save_path + '.svg')
         plt.show()
 
-    def plt_action_histograms(self,
-                              df,
-                              x,
-                              hue,
-                              xlabel,
-                              lg_title,
-                              lg,
-                              bins='auto',
-                              binrange=None,
-                              save_path=None):
-
-
-        num2cat = {0: 'Stop', 1: 'Surge', 2: 'CCW', 3: 'CW'}
-        df.loc[:, hue] = df[hue].map(num2cat)
-
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        # plt.style.use("dark_background")
-
-        fig, ax = plt.subplots(figsize=(3.4, 2))
-
-        ax = sns.histplot(data=df,
-                          x=x,
-                          hue=hue,
-                          element='step',
-                        #   stat='frequency',
-                          bins=bins,
-                          binrange=binrange,
-                          palette='Dark2',
-                          fill=False)
-
-        ax.set_xlabel(xlabel)
-
-        l = ax.legend_
-        l.set_title(lg_title)
-
-        # for j, x in enumerate(lg):
-        # l.texts[j].set_text(x)
-
-        fig.tight_layout()
-        if save_path is not None:
-            plt.savefig(save_path, dpi=300)
-            plt.savefig(save_path + '.svg')
-        plt.show()
-
+    
     def plt_policy(self, df, x, y, col, cat, xlabel, ylabel, save_path=None):
 
         sns.set_style('ticks')
@@ -558,8 +480,6 @@ class MdpPlots(object):
 
         plt.show()
 
-
-
     def plot_actions(self,
                     df,
                     n_actions,
@@ -616,29 +536,7 @@ class MdpPlots(object):
         plt.savefig(save_path, dpi=300)
         plt.show()
 
-    def kinematics(self, df, _x, ylim0, ylim1, logscale=False):
-
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        fig, axs = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-
-        sns.lineplot(data=df, x=_x, y='linear_vel', ax=axs[0])
-        sns.lineplot(data=df, x=_x, y='angular_vel', ax=axs[1])
-
-        if logscale:
-            axs[0].set_xscale('log')
-
-        axs[0].set_xlabel('Blank duration (s)')
-        axs[0].set_ylabel('Linear vel. (mm/s)')
-        axs[1].set_ylabel('Angular vel. (rad/s)')
-
-        axs[0].set_ylim(ylim0)
-        axs[1].set_ylim(ylim1)
-
-        fig.tight_layout()
-        sns.despine(fig)
-        # plt.savefig(save_path, dpi=300)
-        plt.show()
+    
 
     def plot_reward_function(self, df, xlabel, lg, save_path=None, _logx=False):
         """Plot reward function for each state
@@ -742,47 +640,214 @@ class MdpPlots(object):
             plt.savefig(output, dpi=300)
         plt.show()
 
-    def plot_heatmap(self,
-                     df,
-                     x,
-                     y,
-                     z,
-                     xlabel=None,
-                     ylabel=None,
-                     title=None,
-                     output=None):
+    
 
-        df = df.iloc[np.arange(0, len(df), 3)]
-        # df = df[['x', 'y', 'burstiness']].copy().pivot_table(z,
-        #  y,
-        #  x,
-        #  aggfunc=np.mean,
-        #  fill_value=0)
-        # df_smooth = gaussian_filter(df, sigma=40)
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        # fig, ax = plt.subplots(figsize=(7, 4))
-        fig, ax = plt.subplots(figsize=(3.5, 2))
-        # ax = sns.heatmap(df.pivot_table(z, y, x, fill_value=0),
-        #                  center=0,
-        #                  annot=True)
-        # ax = sns.heatmap(df_smooth,
-        #                  vmin=np.min(df_smooth),
-        #                  vmax=np.max(df_smooth),
-        #                  cmap="plasma",
-        #                 #  xticklabels=np.arange(0, 600, 100),
-        #                 #  yticklabels=np.arange(-300, 400, 100),
-        #                  cbar=True)
-        ax = sns.heatmap(df.pivot_table(z, y, x, aggfunc=np.mean,
-                        fill_value=0),
-                        center=0,
-                        annot=False)
-        ax.invert_yaxis()
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        fig.tight_layout()
-        # plt.savefig(save_path, dpi=300)
-        if output is not None:
-            plt.savefig(output, dpi=300)
-        plt.show()
+
+
+
+
+# Plot all the moth trajectories
+def plot_moth_trajectories(df, xlim=(0, 600), ylim=(-360, 360), src=(0, 0, 50), output=None):
+    srcx, srcy, goal_radius = src
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, ax = plt.subplots(figsize=(3.4, 2.83))
+
+    ax.add_artist(Circle((srcx, srcy), goal_radius, color='r', 
+        fill=False, linestyle='--', linewidth=0.5, zorder=1))
+
+    for i, g in df.groupby((df.Time.diff() < 0).cumsum()):
+        ax.plot(g.x_mm, g.y_mm, linewidth=.2, alpha=0.5, color='k', zorder=3)
+        ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1], color='g', s=5)
+
+    ax.scatter(srcx, srcy, marker='*', c='k')
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_xlabel('x (mm)')
+    ax.set_ylabel('y (mm)')
+    ax.set_aspect('equal')
+    fig.tight_layout()
+    plt.savefig(output + '_moth_trajectories', dpi=300)
+    plt.show()
+
+
+def plot_moth_xyjoint(df, xlim=(0, 600), ylim=(-360, 360), src=(0, 0, 50), output=None):
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, ax = plt.subplots(figsize=(3.4, 2.83))
+    ax = sns.jointplot(x='x_mm', y='y_mm',
+                        data=df, kind='kde',
+                        xlim, ylim)
+    fig.tight_layout()
+    plt.savefig(output + '_moth_xyjoint', dpi=300)
+    plt.show()
+
+
+def plot_heatmap(df, x, y, z,
+                xlabel=None,
+                ylabel=None,
+                title=None,
+                output=None):
+
+    df = df.iloc[np.arange(0, len(df), 3)]
+    # df = df[['x', 'y', 'burstiness']].copy().pivot_table(
+    #   z, y, x,
+    #   aggfunc=np.mean,
+    #   fill_value=0)
+    # df_smooth = gaussian_filter(df, sigma=40)
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, ax = plt.subplots(figsize=(3.5, 2))
+    # ax = sns.heatmap(df_smooth,
+    #                  vmin=np.min(df_smooth),
+    #                  vmax=np.max(df_smooth),
+    #                  cmap="plasma",
+    #                 #  xticklabels=np.arange(0, 600, 100),
+    #                 #  yticklabels=np.arange(-300, 400, 100),
+    #                  cbar=True)
+    ax = sns.heatmap(df.pivot_table(z, y, x, aggfunc=np.mean,
+                    fill_value=0),
+                    center=0,
+                    annot=False)
+    ax.invert_yaxis()
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.tight_layout()
+    plt.savefig("heat_map", dpi=300)
+    plt.show()
+
+
+def plot_moth_heading(df):
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax = sns.lineplot(x='tblank', y='heading', data=df)
+    ax.set_ylabel('Delta heading (deg)')
+    ax.set_xlabel('tblank')
+    fig.tight_layout()
+    sns.despine(fig)
+    ax.set_xlim(0, 109 / 30)
+    plt.savefig('tethered2020-moth-heading-v-tblank', dpi=300)
+    plt.show()
+
+
+def plot_hit_rate(df):
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, ax = plt.subplots(figsize=(3.5, 2))
+    ax = sns.lineplot(x='Time', y='hit_rate', data=df)
+    ax.set_ylabel('Hit rate')
+    ax.set_xlabel('Time')
+    fig.tight_layout()
+    sns.despine(fig)
+    plt.savefig('moth-hitrate-v-time', dpi=300)
+    plt.show()
+
+
+def plot_kinematics(df, _x, ylim0, ylim1, logscale=False):
+    sns.set_style('ticks')
+    sns.set_context('paper')
+    fig, axs = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
+
+    sns.lineplot(data=df, x=_x, y='linear_vel', ax=axs[0])
+    sns.lineplot(data=df, x=_x, y='angular_vel', ax=axs[1])
+
+    if logscale:
+        axs[0].set_xscale('log')
+
+    axs[0].set_xlabel('Blank duration (s)')
+    axs[0].set_ylabel('Linear vel. (mm/s)')
+    axs[1].set_ylabel('Angular vel. (rad/s)')
+
+    axs[0].set_ylim(ylim0)
+    axs[1].set_ylim(ylim1)
+
+    fig.tight_layout()
+    sns.despine(fig)
+    plt.savefig("kinematics", dpi=300)
+    plt.show()
+
+
+def plt_action_histograms(df, x, hue,
+                              xlabel,
+                              lg_title,
+                              lg,
+                              bins='auto',
+                              binrange=None,
+                              save_path=None):
+    num2cat = {0: 'Stop', 1: 'Surge', 2: 'CCW', 3: 'CW'}
+    df.loc[:, hue] = df[hue].map(num2cat)
+
+    sns.set_style('ticks')
+    sns.set_context('paper')
+
+    fig, ax = plt.subplots(figsize=(3.4, 2))
+
+    ax = sns.histplot(data=df,
+                        x=x,
+                        hue=hue,
+                        element='step',
+                    #   stat='frequency',
+                        bins=bins,
+                        binrange=binrange,
+                        palette='Dark2',
+                        fill=False)
+    ax.set_xlabel(xlabel)
+    l = ax.legend_
+    l.set_title(lg_title)
+    fig.tight_layout()
+    plt.savefig("action_histograms", dpi=300)
+    plt.show()
+
+
+
+# example
+# def plot_infomation(out_path, plot_type, demos, dataframe):
+#     plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))
+#     outpath = os.path.join(out_path, 'plots')
+
+#     elif plot_type == 'actions':
+#         plotter.plot_actions(
+#             demos, 
+#             4, 
+#             'action', 
+#             'Linear vel. (mm/s)',
+#             'Angular vel. (rad/s)', 
+#             '',
+#             ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+#             outpath + '_mg')
+#         plotter.plt_action_histograms(
+#             demos.copy(),
+#             'linear_vel',
+#             'action',
+#             'Linear vel (mm/s)',
+#             'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+#             bins=32,
+#             save_path=outpath + '_linv_v2')
+#         plotter.plt_action_histograms(
+#             demos.copy(),
+#             'angular_vel',
+#             'action',
+#             'Angular vel (rad/s)',
+#             'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
+#             binrange=[-2*np.pi, 2*np.pi],
+#             save_path=outpath + '_angv_v2')
+
+    # elif plot_type == 'heatmap':
+    #     plotter.plot_heatmap(demos, 'state_num_i', 'antennae',
+    #                             'hits', 'Blank duration',
+    #                             'Hit antenna', 'Cumulative hits',
+    #                             outpath + '_mis_DS')
+
+    #     plotter.plot_heatmap(demos, 'state_num_i', 'antennae', 'wind',
+    #                             'Blank duration', 'Hit antenna',
+    #                             'Wind direction', outpath + '_mis_DS')
+
+    # elif plot_type == 'states':
+    #     plotter.plot_states(demos.copy(), 'log_tblank', 'antennae',
+    #                         r'$\log(1+\tau_b)$', 'Hit antennae',
+    #                         ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_logtb_v2')
+    #     plotter.plot_states(demos.copy(), 'state_num_i', 'antennae',
+    #                         r'Discretized $\tau_b$', 'Hit antennae',
+    #                         ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_disc_v2')

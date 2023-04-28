@@ -7,241 +7,80 @@ OUT: Csv files with state-action trajectories
 
 import os
 import datetime
+from os.path import join
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import preprocessing
-import mdp
-import mdp_plots
-from os.path import join
+import markov_decission_process as mdp
 
 
-def get_tstamp():
+def get_timestamp():
     """
     Return current time in date and time
     """
-    return str(datetime.datetime.now().strftime('%m%d_%H%M%S'))
+    tstamp = datetime.datetime.now()
+    return str(tstamp.strftime('%m%d_%H%M%S'))
+
+
+def get_tblank_bin_edges(mdp_space):
+    """
+    Get a list of time moment which acts as edges of bins
+    for discretizing the timeline
+    """
+    edges = []
+    for k, v in mdp_space.digi_edges.items():
+        edges.append((k, pd.Series(v)))
+    return pd.DataFrame(dict(edges))
 
 
 def get_expert_demos(df):
+    """
+    Encoding the states and actions into discrete space
+    """
     numeric_states = ['log_tblank', 16, True, True, True]
-    # categoric_states = ['antennae', 'wind']
-    categoric_states = ['antennae']
-
-    _mdp = mdp.MothMDP(df, numeric_states, categoric_states)
-
-    print("============================================================")
-    print(_mdp.df[['linear_vel', 'angular_vel', 'tblank']].describe())
-
-    _mdp.encode_states()
-    _mdp.encode_actions()
-
-    transition_prob = _mdp.get_transition_probability()
-    mdp_edges = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in _mdp.digi_edges.items()]))
+    categoric_states = ['antennae'] # or ['antennae', 'wind']
+    mdp_space = mdp.MothMDP(df, numeric_states, categoric_states)
+    mdp_space.encode_states()
+    mdp_space.encode_actions()
+    trans_prob = mdp_space.get_transition_probability()
+    mdp_edges = get_tblank_bin_edges(mdp_space)
+    mdp_demos = mdp_space.df.copy()
+    return mdp_demos, mdp_edges, trans_prob
 
 
-    print("============================================================")
-    print(mdp_edges.T)
-
-    # mdp_demos = _mdp.df[[
-    #     'Time', 'x_mm', 'y_mm', 'linear_vel', 'angular_vel', 
-    #     'tblank', 'log_tblank', 'lasthit', 'hit_rate', 'wind',
-    #     'antennae', 'state_num_i', 'state_i', 'action'
-    # ]].copy()
-
-    mdp_demos = _mdp.df.copy()
-    # Normalized value counts per action
-    print(_mdp.df['action'].value_counts(normalize=True, sort=False))
-    # print()
-    # plt.plot(_mdp.df['tblank'].unique(),
-    #  _mdp.df['tblank'].value_counts(normalize=True, sort=False))
-    # sns.histplot(data=_mdp.df[['log_tblank', 'state_num_i']],
-    #  x='tblank',
-    #  hue=hue,
-    #  log_scale=False,
-    #  cumulative=True,
-    #  element='step',
-    #  fill=True,
-    #  bins=32,
-    #  stat='probability')
-    #  common_norm=True)
-
-    # # norm_cdf = stats.norm.cdf(_mdp.df.log_tblank)
-
-    # data = _mdp.df['log_tblank'].to_numpy()
-    # data_sorted = np.sort(data)
-    # norm_cdf = 1. * np.arange(len(data)) / (len(data) - 1)
-    # plt.plot(data_sorted, norm_cdf)
-    # # smooth
-    # smooth = gaussian_filter1d(norm_cdf, 100)
-
-    # # compute second derivative
-    # smooth_d2 = np.gradient(np.gradient(smooth))
-
-    # # find switching points
-    # infls = np.where(np.diff(np.sign(smooth_d2)))[0]
-    # print("INflection points")
-    # print(infls)
-
-    # plt.scatter(mdp_edges.to_numpy()[:,0], np.zeros(len(mdp_edges)))
-    # plt.show()
-
-    # print(_mdp.df['tortuosity'].describe())
-
-    # sns.heatmap(transition_prob[:, 1, :])
-    # sns.set_style('ticks')
-    # sns.set_context('paper')
-    # fig, ax = plt.subplots(figsize=(7, 4))
-    # ax = sns.violinplot(data=_mdp.df.tblank)
-    # ax = sns.lineplot(x='Time', y='tortuosity', data=_mdp.df)
-    # ax.set_xlim(0, 260.)
-    # fig.tight_layout()
-    # sns.despine(fig)
-    # plt.savefig('tethered2020-moth-time-v-tortuosity', dpi=300)
-    # plt.show()
-
-    # sns.lineplot(x='Time', y='hit_rate', data=mdp_demos)
-    # plt.show()
-    # print(_mdp.df.loc[_mdp.df.state_num_i.eq(7), 'tblank'].head(20))
-    # fig, axs = plt.subplots(2,1)
-    # sns.histplot(_mdp.df.state_num_i, ax=axs[0], bins=32, kde=True)
-    # sns.histplot(_mdp.df.log_tblank, ax=axs[1], bins=32, kde=True)
-    # plt.show()
-
-    return mdp_demos, mdp_edges, transition_prob
+def create_output_folder():
+    """
+    Create output folder to save the proccessed data from original VRmoth data
+    The folder name will have timestamp to distinguish learning attempts
+    """
+    basepath = os.getcwd()
+    directory = join(basepath, f'rldemos_{get_timestamp()}')
+    os.mkdir(directory)
+    return directory
 
 
-def plot_infomation(out_path, plot_type, demos, dataframe):
-    plotter = mdp_plots.MdpPlots('ticks', 'paper', (3.5, 2.6))
-    outpath = os.path.join(out_path, 'plots')
-    if plot_type == 'trajectories':
-        plotter.plot_moth_trajectories(dataframe, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_trajectories')
-
-    elif plot_type == 'xy-joint':
-        plotter.plot_moth_xyjoint(dataframe, (0, 600), (-360, 360), (0, 0, 50), output=outpath + '_jointplot')
-
-    elif plot_type == 'actions':
-        plotter.plot_actions(
-            demos, 
-            4, 
-            'action', 
-            'Linear vel. (mm/s)',
-            'Angular vel. (rad/s)', 
-            '',
-            ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-            outpath + '_mg')
-        plotter.plt_action_histograms(
-            demos.copy(),
-            'linear_vel',
-            'action',
-            'Linear vel (mm/s)',
-            'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-            bins=32,
-            save_path=outpath + '_linv_v2')
-        plotter.plt_action_histograms(
-            demos.copy(),
-            'angular_vel',
-            'action',
-            'Angular vel (rad/s)',
-            'Action', ['Stop', 'Surge', 'Turn CCW', 'Turn CW'],
-            binrange=[-2*np.pi, 2*np.pi],
-            save_path=outpath + '_angv_v2')
-
-    elif plot_type == 'heatmap':
-        plotter.plot_heatmap(demos, 'state_num_i', 'antennae',
-                                'hits', 'Blank duration',
-                                'Hit antenna', 'Cumulative hits',
-                                outpath + '_mis_DS')
-
-        plotter.plot_heatmap(demos, 'state_num_i', 'antennae', 'wind',
-                                'Blank duration', 'Hit antenna',
-                                'Wind direction', outpath + '_mis_DS')
-
-    elif plot_type == 'kinematics':
-        plotter.kinematics(dataframe,
-                            'tblank', (0, 25), (-np.pi / 2, np.pi / 2),
-                            logscale=True)
-
-    elif plot_type == 'states':
-        plotter.plot_states(demos.copy(), 'log_tblank', 'antennae',
-                            r'$\log(1+\tau_b)$', 'Hit antennae',
-                            ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_logtb_v2')
-        plotter.plot_states(demos.copy(), 'state_num_i', 'antennae',
-                            r'Discretized $\tau_b$', 'Hit antennae',
-                            ['None', 'Right', 'Left', 'Both'], save_path=outpath + '_disc_v2')
-
-    elif plot_type == 'heading':
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        # fig, ax = plt.subplots(figsize=(3.5, 2))
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax = sns.lineplot(x='tblank', y='heading', data=dataframe)
-        # ax.set_xscale('log')
-        # ax.set_ylabel(r'$\cos(\pi - \theta_{moth})$')
-        ax.set_ylabel(r'$\Delta$ heading (deg)')
-        # ax.set_xlabel('Blank duration')
-        ax.set_xlabel('tblank')
-        fig.tight_layout()
-        sns.despine(fig)
-        # ax.set_xlim(0, 2)
-        ax.set_xlim(0, 109 / 30)
-        # ax.set_ylim(-90, 90)
-        plt.savefig('tethered2020-moth-heading-v-tblank', dpi=300)
-        plt.show()
-
-    elif plot_type == 'hit-rate':
-        sns.set_style('ticks')
-        sns.set_context('paper')
-        fig, ax = plt.subplots(figsize=(3.5, 2))
-        ax = sns.lineplot(x='Time', y='hit_rate', data=dataframe)
-        # ax.set_xscale('log')
-        ax.set_ylabel('Hit rate')
-        # ax.set_xlabel('Blank duration')
-        ax.set_xlabel('Time')
-        fig.tight_layout()
-        sns.despine(fig)
-        # ax.set_xlim(0, 2)
-        # plt.savefig('tethered2020-moth-hitrate-v-time', dpi=300)
-        plt.show()
-
-
-def save_excel(input_dir, name, mdp_demos):
-    with pd.ExcelWriter(os.path.join(input_dir, f'{name}_stats.xlsx')) as writer:
-        mdp_demos.describe().to_excel(writer,
-                                float_format="%.4f",
-                                sheet_name='Description')
-        mdp_demos.head(100).to_excel(writer,
-                                float_format="%.4f",
-                                sheet_name='Head')
-        mdp_demos['state_i'].value_counts(normalize=True).to_excel(
-            writer, float_format="%.4f", sheet_name='States')
-        mdp_demos['action'].value_counts(normalize=True).to_excel(
-            writer, float_format="%.4f", sheet_name='Actions')
+def export_to_csv(data, file_name, destination_folder):
+    """
+    Export processed data into csv files for learning using IRL_execute
+    """
+    filepath = join(destination_folder, file_name)
+    data.to_csv(filepath, index=False)
 
 
 if __name__ == "__main__":
     dfs = preprocessing.merge_data(timeout=260)
     mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())
 
-    # features = mdp_demos.groupby('state_i')[['wind', 'hits', 'linear_vel', 'angular_vel']].mean()
-    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
+    # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
     features = mdp_demos.groupby('state_i')[['wind', 'hit_rate']].median()
     features['wind'] = features.wind.astype('uint8')
     features['hit_rate'] = features.hit_rate.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
-    basepath = os.getcwd()
-    out_dir = join(basepath, f'rldemos_{get_tstamp()}')
-    os.mkdir(out_dir)
-
     # export all the results (bins, features, transittion matrix) into csv files
+    out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
-    mdp_edges.to_csv((join(out_dir, 'bin_edges.csv')), index=False)
-    features.to_csv((join(out_dir, 'features.csv')), index=False)
-
+    export_to_csv(mdp_edges, 'bin_edges.csv', out_dir)
+    export_to_csv(features, 'features.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-        g.to_csv(join(out_dir, f'{len(g.index)}-{i+1}.csv'), index=False)
-
-    # # if args.plot:
-    # #     plot_infomation(out_path, args.plot, mdp_demos.copy(), dfs.copy())  
+        export_to_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)
