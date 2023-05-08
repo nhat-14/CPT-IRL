@@ -207,28 +207,38 @@ def create_output_folder():
     return dir_name
 
 
+def initialize_feature_matrix():
+    """
+    Get feature dataframe from the features.csv generated 
+    from data processing step in bombyxmdp
+    """
+    feature_path = get_file_path('features.csv')
+    matrix = pd.read_csv(feature_path).values
+    print(f'Shape of feature matrix: {matrix.shape}')
+    return matrix
+
+
 if __name__ == "__main__":
+    """
+    Extract a reward function using MaxEnt IRL and the moth trajectories
+    """
+    print(f'NN structure: {cfg.structure}; learning rate: {cfg.learning_rate}')
+
     # Load the state transition probabilities
     trans_prob = np.load(get_file_path('trans_prob.npy'))
 
     # Construct a mothworld object
-    mothworld = neo_mothworld.MothWorld(cfg.n_states, cfg.n_sub_states, cfg.discount, trans_prob)
+    mothworld = neo_mothworld.MothWorld(trans_prob)
 
-    # Initialize the feature matrix
-    feature_path = get_file_path('features.csv')
-    feature_matrix = pd.read_csv(feature_path).values
-    print(f'Shape of feature matrix: {feature_matrix.shape}')
-
-    # Extract a reward function using MaxEnt IRL and the moth trajectories
-    structure = (4, 3)
-    print(f'NN structure: {structure}; learning rate: {cfg.learning_rate}')
+    feature_matrix = initialize_feature_matrix()
 
     # Whether to use L2 regularization in the gradient descent l2reg
     (l1, l2) = tuple(cfg.l2reg) if cfg.l2reg else (0,0)  
+    
+    trajectories = read_trajectories(cfg.trajectory_len)
 
     # Calculating reward
-    trajectories = read_trajectories(cfg.trajectory_len)
-    r = deep_maxent.irl((feature_matrix.shape[1],) + structure,
+    r = deep_maxent.irl((feature_matrix.shape[1],) + cfg.structure,
                         feature_matrix,
                         mothworld.n_actions,
                         mothworld.discount,

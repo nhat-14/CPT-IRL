@@ -1,26 +1,24 @@
 import numpy as np
 import numpy.random as rn
+import config as cfg
 
 class MothWorld():
     """
     Gridworld MDP.
     """
-
-    def __init__(self, grid_size, grid_axes, discount, transition_probability):
+    def __init__(self, transition_probability):
         """
         grid_size: Grid size. int.
         discount: MDP discount. float.
         transition_probability (3D numpy array): state transition probabilities
         -> Gridworld
         """
-        self.actions = [0, 1, 2, 3]
-        self.n_actions = len(self.actions)
-        self.n_states = grid_size
-        self.substate = grid_axes
-        self.grid_size = grid_size
-        self.discount = discount
-
-        # Preconstruct the transition probability array.
+        self.actions = cfg.actions
+        self.n_actions = cfg.n_actions
+        self.n_states = cfg.n_states
+        self.substate = cfg.n_sub_states
+        self.grid_size = cfg.n_states
+        self.discount = cfg.discount
         self.transition_probability = transition_probability
 
     def feature_vector(self, i, feature_map="ident"):
