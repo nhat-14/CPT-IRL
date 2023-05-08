@@ -7,7 +7,7 @@ Extract reward and action-value functions with:
 
 ## MaxEnt IRL
 
-- Store the states and actions of the behavior you want to analyze in a folder, for example `/path/to/csvs`. Some example trajectories are provided [here](https://drive.google.com/file/d/1ZkKS-h6VS1Pr6MhKpP9av_yKt6z6PxyD/view?usp=sharing).
+- Store the states and actions of the behavior you want to analyze in a folder, for example `/data`. Some example trajectories are provided [here](https://drive.google.com/file/d/1ZkKS-h6VS1Pr6MhKpP9av_yKt6z6PxyD/view?usp=sharing).
 - Such states and actions must be in csv files with column names `state` and `action` like:
 
 
@@ -16,24 +16,12 @@ Extract reward and action-value functions with:
 |0		|1     |
 
 - Set the values of discount, epochs, learning rate, trajectory length by editing the file `config.json`
-- Type `maxent_bombyx --help` in the terminal to see how to use the script. It should output this: 
 
 ```console
 usage: maxent_bombyx [-h] [--version] [--save-csv] [--plots] --data-dir
                      DATA_DIR [-v] [-vv]
 
 Estimates the reward function of a silkmoth based on MaxEnt IRL
-
-optional arguments:
-  -h, --help           show this help message and exit
-  --version            show programs version number and exit
-  --save-csv           Save extracted reward and action-values as csv
-  --plots              Plot reward and action-value function
-  --data-dir DATA_DIR  Path of the directory with the input data
-  -v, --verbose        set loglevel to INFO
-  -vv, --very-verbose  set loglevel to DEBUG
-
-```
 
 **Example**: Calculate moth reward and action-value and save the heatmap for each of these as well as the values as csv:
 
