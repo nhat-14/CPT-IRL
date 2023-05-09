@@ -22,17 +22,17 @@ import config as cfg
 
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
-def read_trajectories(traj_length=0):
+def read_trajectories():
     """
-        Make a (T, L, 2) 3D numpy array where T is the number 
-        of csv files and L is the trajectory length.
-        2 means two columns (of states-actions)
+    Make a (T, L, 2) 3D numpy array where T is the number 
+    of csv files and L is the trajectory length.
+    2 means two columns (of states-actions)
     """
     csvs = load_csv_files()
     trajs = []
     for csv_file in csvs:
-        print(f'Working on: {os.path.basename(os.path.splitext(csv_file)[0])}.csv')
-        dataframe = pd.read_csv(csv_file, index_col=None, nrows=traj_length)
+        print(f'Working on: {os.path.basename(csv_file)}')
+        dataframe = pd.read_csv(csv_file, nrows=cfg.trajectory_len)
 
         # Handle data as numpy array
         num_df = dataframe[["state_i", "action"]].values
@@ -219,11 +219,6 @@ def initialize_feature_matrix():
 
 
 if __name__ == "__main__":
-    """
-    Extract a reward function using MaxEnt IRL and the moth trajectories
-    """
-    print(f'NN structure: {cfg.structure}; learning rate: {cfg.learning_rate}')
-
     # Load the state transition probabilities
     trans_prob = np.load(get_file_path('trans_prob.npy'))
 
@@ -233,12 +228,13 @@ if __name__ == "__main__":
     feature_matrix = initialize_feature_matrix()
 
     # Whether to use L2 regularization in the gradient descent l2reg
-    (l1, l2) = tuple(cfg.l2reg) if cfg.l2reg else (0,0)  
+    (l1, l2) = tuple(cfg.l2reg) if cfg.l2reg else (0,0)
     
-    trajectories = read_trajectories(cfg.trajectory_len)
-
+    trajectories = read_trajectories()
+    
+    NeuronNet_structure = (feature_matrix.shape[1],) + cfg.structure
     # Calculating reward
-    r = deep_maxent.irl((feature_matrix.shape[1],) + cfg.structure,
+    r = deep_maxent.irl(NeuronNet_structure,
                         feature_matrix,
                         mothworld.n_actions,
                         mothworld.discount,

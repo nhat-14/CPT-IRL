@@ -25,7 +25,7 @@ discount            = 0.9       # Discount factor
 epochs              = 200       # Training epochs for the gradient descent
 learning_rate       = 0.01
 trajectory_len      = 109
-structure           = (4, 3)
+structure           = (4, 3)    # Neural network structure tuple
 
 # Action related configurations
 n_actions           = 4
