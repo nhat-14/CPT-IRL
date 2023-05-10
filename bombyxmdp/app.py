@@ -59,7 +59,7 @@ def create_output_folder():
     return directory
 
 
-def export_to_csv(data, file_name, destination_folder):
+def export_csv(data, file_name, destination_folder):
     """
     Export processed data into csv files for learning using IRL_execute
     """
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     # export all the results (bins, features, transittion matrix) into csv files
     out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
-    export_to_csv(mdp_edges, 'bin_edges.csv', out_dir)
-    export_to_csv(features, 'features.csv', out_dir)
+    export_csv(mdp_edges, 'bin_edges.csv', out_dir)
+    export_csv(features, 'features.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
-        export_to_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)
+        export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)

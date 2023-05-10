@@ -23,11 +23,6 @@ optional arguments:
                         Number of simulation runs
   -t TLIM, --tlim TLIM  Simulation time limit in seconds
   --hit-prob HIT_PROB   Hit probability
-  -a, --animation       Draw animation
-  --plot-traj           Plot trajectories
-  --save-csv            Save log to csv
-  -v, --verbose         set loglevel to INFO
-  -vv, --very-verbose   set loglevel to DEBUG
 ```
 
 # Windows

@@ -271,9 +271,6 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
 
     adagrad_epsilon = 1e-6  # AdaGrad numerical stability.
 
-
-
-
     #### Theano symbolic setup. ####
 
     # Symbolic input.
@@ -288,16 +285,20 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
                            + W.dot(φs[-1]))
         φs.append(φ)
         # φs[1] = φ1 etc.
+
     # Reward.
     r = α.dot(φs[-1]).reshape((n_states,))
+
     # Engineering hack: z-score the reward.
     r = (r - r.mean())/r.std()
+
     # Associated feature expectations.
     expected_svf = find_expected_svf(n_states, r,
                                      n_actions, discount,
                                      transition_probability,
                                      trajectories)
     svf = find_svf(n_states, trajectories.get_value())
+
     # Derivatives (backward propagation).
     updates = []
     α_grad = φs[-1].dot(svf - expected_svf).T
