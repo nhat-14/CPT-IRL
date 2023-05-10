@@ -3,34 +3,36 @@ This file estimates the reward function of a silkmoth based on Deep
 Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
 """
 
-import json
 import glob
 import os
 from datetime import datetime
 from pathlib import Path
+from os.path import join
+
 import h5py
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 import neo_mothworld
 from myirl import value_iteration
 from myirl import deep_maxent
-from os.path import join
+import config as cfg
 
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
-def read_trajectories(csvs, traj_length=0):
+def read_trajectories():
     """
-        Make a (T, L, 2) 3D numpy array where T is the number 
-        of csv files and L is the trajectory length.
-        2 means two columns (of states-actions)
+    Make a (T, L, 2) 3D numpy array where T is the number 
+    of csv files and L is the trajectory length.
+    2 means two columns (of states-actions)
     """
-
+    csvs = load_csv_files()
     trajs = []
     for csv_file in csvs:
-        print(f'Working on: {os.path.basename(os.path.splitext(csv_file)[0])}.csv')
-        dataframe = pd.read_csv(csv_file, index_col=None, nrows=traj_length)
+        print(f'Working on: {os.path.basename(csv_file)}')
+        dataframe = pd.read_csv(csv_file, nrows=cfg.trajectory_len)
 
         # Handle data as numpy array
         num_df = dataframe[["state_i", "action"]].values
@@ -82,11 +84,10 @@ def plot_reward_function(df, yticks, save_path, _annot=True):
     plt.show()
 
 
-def plot_policy():
-    Path(join(input_dir, out_dir)).mkdir(parents=True, exist_ok=True)
-    tmp_dir = join(input_dir, out_dir)
-    plot_title = f'Epochs: {epochs}, Trajectory length: {traj_len}, \
-        Discount: {discount}, Learning rate: {learning_rate}'
+def plot_policy(out_dir):
+    tmp_dir = join(cfg.input_dir, out_dir)
+    plot_title = f'Epochs: {cfg.epochs}, Trajectory length: {cfg.trajectory_len}, \
+        Discount: {cfg.discount}, Learning rate: {cfg.learning_rate}'
 
     sns.set_style('ticks')
     sns.set_context('paper')
@@ -96,12 +97,12 @@ def plot_policy():
     ax_r = sns.heatmap(ex_reward.T,
                         center=0,
                         cmap='magma',
-                        yticklabels=cfg["substate_ticks"][state_names[1]],
+                        yticklabels=cfg.substate_ticks[cfg.state_names[1]],
                         annot=True,
                         cbar_kws={'label': 'Reward'})
 
-    ax_r.set_xlabel(cfg["state_labels"][state_names[0]])
-    ax_r.set_ylabel('{}'.format(cfg["state_labels"][state_names[1]]))
+    ax_r.set_xlabel(cfg.state_labels[cfg.state_names[0]])
+    ax_r.set_ylabel(cfg.state_labels[cfg.state_names[1]])
     ax_r.invert_yaxis()
 
     if cfg["draw_subgrid"]:
@@ -119,31 +120,30 @@ def plot_policy():
 
     for i, ax in enumerate(ax_q.flat):
 
-        sns.heatmap(moth_policy[i].reshape(*grid_axes), center=0,
+        sns.heatmap(moth_policy[i].reshape(*cfg.n_sub_states), center=0,
                     ax=ax,
                     cbar=i == 0,
                     vmin=0, vmax=1,
                     cbar_ax=None if i else cbar_ax,
-                    xticklabels=cfg["substate_ticks"][state_names[1]], annot=True)
+                    xticklabels=cfg.substate_ticks[cfg.state_names[1]], annot=True)
 
-        ax.set_title(f'{action_labels[i]}')
+        ax.set_title(f'{cfg.action_labels[i]}')
         ax.invert_yaxis()
-        ax.set_xlabel(f'{cfg["state_labels"][state_names[1]]}')
+        ax.set_xlabel(f'{cfg.state_labels[cfg.state_names[1]]}')
 
-        if cfg["draw_subgrid"]:
-            ax.vlines(cfg["subgrid_ticks"], *ax.get_ylim(),
+        if cfg.draw_subgrid:
+            ax.vlines(cfg.subgrid_ticks, *ax.get_ylim(),
                         linestyle='--', linewidth=0.5, color='w')
 
-        ax_q[0].set_ylabel(cfg["state_labels"][state_names[0]])
+        ax_q[0].set_ylabel(cfg.state_labels[cfg.state_names[0]])
 
     fig.suptitle(plot_title)
     plt.savefig(join(tmp_dir, 'Policy.png'), dpi=300)
     print('Plots saved to disk')
 
 
-def save_csv():
-    Path(join(input_dir, out_dir)).mkdir(parents=True, exist_ok=True)
-    tmp_dir = join(input_dir, out_dir)
+def save_csv(out_dir):
+    tmp_dir = join(cfg.input_dir, out_dir)
 
     # Saving reward to csv
     pd.DataFrame(ex_reward).to_csv(join(tmp_dir, 'Reward.csv'))
@@ -153,77 +153,100 @@ def save_csv():
 
     # Saving policy to h5 and csv
     with h5py.File(join(tmp_dir, 'policy.h5'), 'w') as hf:
-        hf.create_dataset("policy",  data=moth_policy.reshape(mothworld.n_actions, *grid_axes))
+        hf.create_dataset("policy",  data=moth_policy.reshape(mothworld.n_actions, *cfg.n_sub_states))
 
     for i in range(len(moth_policy)):
-        pd.DataFrame(moth_policy[i].reshape(grid_axes)).to_csv(
-            join(tmp_dir, 'policy_{0}.csv'.format(action_labels[i])))
+        pd.DataFrame(moth_policy[i].reshape(cfg.n_sub_states)).to_csv(
+            join(tmp_dir, 'policy_{0}.csv'.format(cfg.action_labels[i])))
 
     print('Reward and policy saved to disk')
 
 
+def get_current_time():
+    """
+    Get the current time until seconds under the string format
+    """
+    return datetime.now().strftime('%m%d_%H%M%S')
+
+
+def load_csv_files():
+    """
+    return a list of absolute path string. Each path point to a csv file
+    (except the feature.csv) from input_dir containing trajectories data.
+    """
+    # Load csv logs except the feature.csv
+    paths = get_file_path('[!f]*.csv')
+    paths_with_full_name = glob.glob(paths)
+    return paths_with_full_name
+
+
+def get_file_path(filename):
+    """
+    Return the absolute path of a file in the data input folder give a name.
+    """
+    return join(cfg.input_dir, filename)
+
+
+def generate_output_folder_name():
+    """
+    Folder where all output data will be stored. Name will contain time and 
+    learning configurations
+    """
+    time_log = get_current_time()
+    config_log = f'e{cfg.epochs}_t{cfg.trajectory_len}_g{cfg.discount}'
+    return f'DeepMaxEnt_{config_log}_{time_log}'
+
+
+def create_output_folder():
+    """
+    Create an output folder to store learning results
+    """ 
+    dir_name = generate_output_folder_name()
+    path_obj = Path(join(cfg.input_dir, dir_name))
+    path_obj.mkdir(parents=True, exist_ok=True)
+    return dir_name
+
+
+def initialize_feature_matrix():
+    """
+    Get feature dataframe from the features.csv generated 
+    from data processing step in bombyxmdp
+    """
+    feature_path = get_file_path('features.csv')
+    matrix = pd.read_csv(feature_path).values
+    print(f'Shape of feature matrix: {matrix.shape}')
+    return matrix
+
+
 if __name__ == "__main__":
-    # Load and parse json configuration
-    basepath = os.getcwd()
-    input_dir = join(basepath, "data")
-    config_file = join(input_dir, 'config.json')
-    with open(config_file, encoding='UTF-8') as file:
-        cfg = json.load(file)
-
-    grid = cfg['n_states']
-    grid_axes = cfg['n_sub_states']
-    discount = cfg['discount']  # Discount factor
-    epochs = cfg['epochs']    # Training epochs for the gradient descent
-    learning_rate = cfg['learning_rate']
-    traj_len = cfg['trajectory_length']
-    state_names = cfg['state_names']
-    action_labels = cfg["action_labels"]
-    l2reg = False
-
-    # Whether to use L2 regularization in the gradient descent l2reg
-    if l2reg:
-        l1, l2 = tuple(l2reg)
-    else:
-        l1 = l2 = 0
-
-    # Path where all output data will be stored
-    time_now = str(datetime.now().strftime('%m%d_%H%M%S'))
-    out_dir = f'DeepMaxEnt_e{epochs}_t{traj_len}_g{discount}_{time_now}'
-
-    # Read csv logs from input_dir into trajectories (of state-action)
-    # except the feature.csv
-    csvs = list(glob.glob(join(input_dir, '[!f]*.csv')))
-    trajectories = read_trajectories(csvs, traj_len)
-
     # Load the state transition probabilities
-    trans_prob = np.load(join(input_dir, 'trans_prob.npy'))
+    trans_prob = np.load(get_file_path('trans_prob.npy'))
 
     # Construct a mothworld object
-    mothworld = neo_mothworld.MothWorld(grid, grid_axes, discount, trans_prob)
+    mothworld = neo_mothworld.MothWorld(trans_prob)
 
-    # Initialize the feature matrix
-    feature_path = join(input_dir, 'features.csv')
-    feature_matrix = pd.read_csv(feature_path).values
-    print(f'Shape of feature matrix: {feature_matrix.shape}')
+    feature_matrix = initialize_feature_matrix()
 
-    # Extract a reward function using MaxEnt IRL and the moth trajectories
-    structure = (4, 3)
-    print(f'NN structure: {structure}; learning rate: {learning_rate}')
-
+    # Whether to use L2 regularization in the gradient descent l2reg
+    (l1, l2) = tuple(cfg.l2reg) if cfg.l2reg else (0,0)
+    
+    trajectories = read_trajectories()
+    
+    NeuronNet_structure = (feature_matrix.shape[1],) + cfg.structure
     # Calculating reward
-    r = deep_maxent.irl((feature_matrix.shape[1],) + structure,
+    r = deep_maxent.irl(NeuronNet_structure,
                         feature_matrix,
                         mothworld.n_actions,
                         mothworld.discount,
                         mothworld.transition_probability,
                         trajectories,
-                        epochs,
-                        learning_rate,
+                        cfg.epochs,
+                        cfg.learning_rate,
                         l1=l1,
                         l2=l2)
 
     # Reshape reward
-    ex_reward = r.reshape(*grid_axes)
+    ex_reward = r.reshape(*cfg.n_sub_states)
     mean_reward = [round(np.mean(ex_reward[:, i]), 2) for i in range(ex_reward.shape[1])]
     print(f'Mean reward: {mean_reward}')
 
@@ -232,7 +255,7 @@ if __name__ == "__main__":
                                               mothworld.n_actions,
                                               mothworld.transition_probability, 
                                               r,
-                                              discount, 
+                                              cfg.discount, 
                                               threshold=1e-2)
     
     simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mothworld.n_states)])
@@ -242,5 +265,7 @@ if __name__ == "__main__":
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
     moth_policy = moth_policy.T
     print(f'Policy: {moth_policy.shape}\n{moth_policy}')
-    save_csv()
-    plot_policy()
+
+    output_folder = create_output_folder()
+    save_csv(output_folder)
+    # plot_policy(output_folder)

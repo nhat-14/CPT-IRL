@@ -10,7 +10,7 @@ matthew.alger@anu.edu.au
 from itertools import product
 
 import numpy as np
-import numpy.random as rn
+from numpy import random
 import theano as th
 import theano.tensor as T
 from tqdm import tqdm
@@ -189,6 +189,16 @@ def find_expected_svf(n_states, r, n_actions, discount,
     return svf.sum(axis=0) + p_start_state
 
 
+def get_random_matrix(random_type, shape):
+    """
+    Generate a random matrix given its dimension and random type
+    """
+    if random_type == "normal":
+        return random.normal(size=shape)
+    else:
+        return random.uniform(size=shape)
+
+    
 def irl(structure, feature_matrix, n_actions, discount, transition_probability,
         trajectories, epochs, learning_rate, initialisation="normal", l1=0.1,
         l2=0.1):
@@ -223,42 +233,39 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
     -> Reward vector with shape (N,).
     """
 
-    n_states, d_states = feature_matrix.shape
+    n_states, dimen_states = feature_matrix.shape
     transition_probability = th.shared(transition_probability, borrow=True)
     trajectories = th.shared(trajectories, borrow=True)
-    rn.seed(99)
+    random.seed(99)
 
     # Initialise W matrices; b biases.
-    n_layers = len(structure)-1
+    n_layers = len(structure) - 1
     weights = []
     hist_w_grads = []  # For AdaGrad.
     biases = []
     hist_b_grads = []  # For AdaGrad.
+
     for i in range(n_layers):
-        # W
+        # Weight initialization
         shape = (structure[i+1], structure[i])
-        if initialisation == "normal":
-            matrix = th.shared(rn.normal(size=shape), name="W", borrow=True)
-        else:
-            matrix = th.shared(rn.uniform(size=shape), name="W", borrow=True)
-        weights.append(matrix)
+        matrix = get_random_matrix(initialisation, shape)
+        weight = th.shared(matrix, name="W", borrow=True)
+        weights.append(weight)
         hist_w_grads.append(th.shared(np.zeros(shape), name="hdW", borrow=True))
 
-        # b
+        # bias initialization
         shape = (structure[i+1], 1)
-        if initialisation == "normal":
-            matrix = th.shared(rn.normal(size=shape), name="b", borrow=True)
-        else:
-            matrix = th.shared(rn.uniform(size=shape), name="b", borrow=True)
-        biases.append(matrix)
+        matrix = get_random_matrix(initialisation, shape)
+        bias = th.shared(matrix, name="b", borrow=True)
+        biases.append(bias)
         hist_b_grads.append(th.shared(np.zeros(shape), name="hdb", borrow=True))
 
     # Initialise α weight, β bias.
     if initialisation == "normal":
-        α = th.shared(rn.normal(size=(1, structure[-1])), name="alpha",
+        α = th.shared(random.normal(size=(1, structure[-1])), name="alpha",
                       borrow=True)
     else:
-        α = th.shared(rn.uniform(size=(1, structure[-1])), name="alpha",
+        α = th.shared(random.uniform(size=(1, structure[-1])), name="alpha",
                       borrow=True)
     hist_α_grad = T.zeros(α.shape)  # For AdaGrad.
 
@@ -268,6 +275,7 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
 
     # Symbolic input.
     s_feature_matrix = T.matrix("x")
+    
     # Feature matrices.
     # All dimensions of the form (d_layer, n_states).
     φs = [s_feature_matrix.T]
@@ -277,16 +285,20 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
                            + W.dot(φs[-1]))
         φs.append(φ)
         # φs[1] = φ1 etc.
+
     # Reward.
     r = α.dot(φs[-1]).reshape((n_states,))
+
     # Engineering hack: z-score the reward.
     r = (r - r.mean())/r.std()
+
     # Associated feature expectations.
     expected_svf = find_expected_svf(n_states, r,
                                      n_actions, discount,
                                      transition_probability,
                                      trajectories)
     svf = find_svf(n_states, trajectories.get_value())
+
     # Derivatives (backward propagation).
     updates = []
     α_grad = φs[-1].dot(svf - expected_svf).T
@@ -310,6 +322,7 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
         hist_w_grads[i] += w_grad**2
         adj_w_grad = w_grad/(adagrad_epsilon + T.sqrt(hist_w_grads[i]))
         updates.append((W, W + adj_w_grad*learning_rate))
+
     for i, b in enumerate(biases):
         b_grads, _ = th.scan(fn=grad_for_state,
                              sequences=[T.arange(n_states)],
