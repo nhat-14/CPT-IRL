@@ -153,7 +153,7 @@ def merge_data(timeout=0):
         df['hits_count'] = count_hits(df['whiff'])
         
         # get number of hits per 1 second
-        df.loc[:, 'hit_rate'] = df['whiff'].rolling(int(1 / time_step)).sum()
+        df.loc[:, 'hit_rate'] = df['whiff'].rolling(int(1 / time_step), min_periods=1).sum()
 
         # Get last hit (Both, Left, Right)
         df.loc[:, 'lasthit'] = df[df.antennae > 0].antennae

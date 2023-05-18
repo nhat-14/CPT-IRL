@@ -70,7 +70,7 @@ def export_csv(data, file_name, destination_folder):
 if __name__ == "__main__":
     dfs = preprocessing.merge_data(timeout=260)
     mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())
-
+    
     # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
     features = mdp_demos.groupby('state_i')[['wind', 'hit_rate']].median()
     features['wind'] = features.wind.astype('uint8')
@@ -82,5 +82,6 @@ if __name__ == "__main__":
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
     export_csv(mdp_edges, 'bin_edges.csv', out_dir)
     export_csv(features, 'features.csv', out_dir)
+    export_csv(mdp_demos, 'mdp_demos.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
         export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)

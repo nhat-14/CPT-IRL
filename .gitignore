@@ -54,3 +54,5 @@ MANIFEST
 experiments/*
 
 *.h5
+
+.simulator/bombyxsim-template/silkmoth_smokevid_KPB*

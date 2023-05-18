@@ -11,7 +11,7 @@ from utils import fileIO
 import simulator
 
 if __name__ == "__main__":
-    tlim = 260              # Simulation time limit in seconds
+    tlim = 250              # Simulation time limit in seconds
     env = "smokevid"        #Type of environment
     agt = "silkmoth"        #Type of agent
     controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
