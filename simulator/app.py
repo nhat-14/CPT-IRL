@@ -10,15 +10,30 @@ from tqdm import tqdm
 from utils import fileIO
 import simulator
 
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+
+
+def print_simulation_result(performance):
+    print('Performance metrics:')
+    p = pd.DataFrame(performance)
+    success_rate_mean = p['success_rate'].sum() / Nruns
+    success_rate_std = p['success_rate'].std()
+    search_time_mean = p.loc[p.success_rate == 1, 'search_time'].mean()
+    search_time_std = p.loc[p.success_rate == 1, 'search_time'].std()
+    print(f'Success rate: {success_rate_mean} +- {success_rate_std}')
+    print(f'Search time: {search_time_mean} +- {search_time_std}')
+    print('End of script')
+
+
 if __name__ == "__main__":
     tlim = 250              # Simulation time limit in seconds
     env = "smokevid"        #Type of environment
     agt = "silkmoth"        #Type of agent
     controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
-    Nruns = 50               #Number of simulation runs
+    Nruns = 50              #Number of simulation runs
     animation = False       #Draw animation
-    # Path of the directory with odor plume data
-    input_dir = "bombyxsim-template"
+    input_dir = "bombyxsim-template" # Path of the directory with odor plume data
     save_log = True
     plt_traj = True
 
@@ -36,6 +51,9 @@ if __name__ == "__main__":
         out_dir = f'{agt}_{env}_{controller[0]}_{Nruns}runs_{fileIO.tstamp()}'
         tmp_dir = fileIO.make_dir(input_dir, out_dir)
 
+    fig, ax = plt.subplots()
+    ax.add_artist(Circle((0,0), 50, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
+
     for i in tqdm(range(Nruns)):
         plume = random.choice(plumes)
         experiment_id = os.path.basename(os.path.splitext(plume)[0])
@@ -48,12 +66,19 @@ if __name__ == "__main__":
             trajectory = sim.run(plume, draw_animation=animation)
 
         # sim.plot_trajectory(trajectory, os.path.join(tmp_dir, experiment_id))
+        ax.plot(trajectory.iloc[:,0], trajectory.iloc[:,1], linewidth=0.5, c='g')
 
-    print('Performance metrics:')
-    p = pd.DataFrame(sim.performance)
-    print('Success rate: {:.4f} +- {:.4f}'.format(
-        p['success_rate'].sum() / Nruns, p['success_rate'].std()))
-    print('Search time: {:.4f} +- {:.4f}'.format(
-        p.loc[p.success_rate == 1, 'search_time'].mean(),
-        p.loc[p.success_rate == 1, 'search_time'].std()))
-    print('End of script')
+    ax.scatter(0, 0, marker='*', c='k')
+    ax.set_xlim(0,600)
+    ax.set_ylim(-360,360)
+    ax.set_aspect('equal')
+    plt.show()
+
+    print_simulation_result(sim.performance)
+    # print('Performance metrics:')
+    # p = pd.DataFrame(sim.performance)
+    # print(f'Success rate: {p['success_rate'].sum() / Nruns} +- {p['success_rate'].std()}')
+    # print(f'Search time: {p.loc[p.success_rate == 1, 'search_time'].mean()} 
+    #       +- {p.loc[p.success_rate == 1, 'search_time'].std()}')
+    # print('End of script')
+

@@ -256,8 +256,9 @@ if __name__ == "__main__":
     full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
     full_demos_data["reward"] = np.nan
     
-    feature_matrix = np.eye(cfg.n_states)
-    feature_matrix = full_demos_data.groupby('state_i')[["wind"]].median()
+    feature_matrix = get_feature_matrix()
+    # feature_matrix = np.eye(cfg.n_states)
+    # feature_matrix = full_demos_data.groupby('state_i')[["wind"]].median()
     for i in range(1):
         print(i+1)
         NeuronNet_structure = (feature_matrix.shape[1],) + cfg.structure

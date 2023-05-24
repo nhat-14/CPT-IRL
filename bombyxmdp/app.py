@@ -72,9 +72,12 @@ if __name__ == "__main__":
     mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())
     
     # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
-    features = mdp_demos.groupby('state_i')[['wind', 'hit_rate']].median()
-    features['wind'] = features.wind.astype('uint8')
-    features['hit_rate'] = features.hit_rate.astype('uint8')
+    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
+    features = mdp_demos.groupby('state_i')[['tblank', 'linear_vel', "antennae"]].median()
+    # features['wind'] = features.wind.astype('uint8')
+    features['tblank'] = features.tblank.astype('uint8')
+    features['antennae'] = features.antennae.astype('uint8')
+    features['linear_vel'] = features.linear_vel.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
     # export all the results (bins, features, transittion matrix) into csv files
