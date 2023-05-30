@@ -209,9 +209,18 @@ def get_feature_matrix():
     Get feature dataframe from the features.csv generated 
     from data processing step in bombyxmdp
     """
-    feature_path = get_file_path('features.csv')
-    matrix = pd.read_csv(feature_path).values
+    full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
+    full_demos_data["reward"] = np.nan
+    # feature_matrix = np.eye(cfg.n_states)
+    # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
+    matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
+    matrix['wind'] = matrix.wind.astype('uint8')
+    # features['tblank'] = features.tblank.astype('uint8')
+    # features['antennae'] = features.antennae.astype('uint8')
+    # features['linear_vel'] = features.linear_vel.astype('uint8')
+    # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
     print(f'Shape of feature matrix: {matrix.shape}')
+    matrix.to_csv("features.csv", index=False)
     return matrix
 
 
@@ -252,13 +261,7 @@ if __name__ == "__main__":
     l1, l2 = initilize_regularization()
     trajectories = read_trajectories()
     
-    #===========================================================================
-    full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
-    full_demos_data["reward"] = np.nan
     
-    feature_matrix = get_feature_matrix()
-    # feature_matrix = np.eye(cfg.n_states)
-    # feature_matrix = full_demos_data.groupby('state_i')[["wind"]].median()
     for i in range(1):
         print(i+1)
         NeuronNet_structure = (feature_matrix.shape[1],) + cfg.structure
