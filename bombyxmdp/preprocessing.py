@@ -38,7 +38,7 @@ def get_angular_vel(theta, dt):
     """
     theta = theta.to_numpy()
     delta_theta = (theta[:-1] - theta[1:])
-    # avoid abrupt changes from 2*pi to 0 or opposite
+    # # avoid abrupt changes from 2*pi to 0 or opposite
     delta_theta = np.where(delta_theta > 5.0, delta_theta - 2*np.pi, delta_theta)
     delta_theta = np.where(delta_theta < -5.0, delta_theta + 2*np.pi, delta_theta)
     delta_theta = np.insert(delta_theta, 0, 0)
@@ -131,10 +131,52 @@ def merge_data(timeout=0):
         # Define time step duration as a convenience variable (0.0333s)
         time_step = df['Time'].iloc[1]
 
+        # calculating simple moving average
+        # using .rolling(window).mean() ,
+        # with window size = 15. 0.5s
         # Calculate linear velocity and angular velocity
         df['linear_vel'] = get_linear_vel(df['x_mm'], df['y_mm'], time_step)
         df['angular_vel'] = get_angular_vel(df['theta_rad'], time_step)
         
+        # moving average 
+        df['linear_vel'] = df['linear_vel'].rolling(450).mean()
+        df['angular_vel'] = df['angular_vel'].rolling(450).mean()
+        # removing all the NULL values using
+        df.dropna(inplace=True)
+
+        import matplotlib.pyplot as plt
+  
+       
+        # create figure and axis objects with subplots()
+        fig,ax = plt.subplots()
+        # make a plot
+        ax.plot(df.iloc[:]['Time'].tolist(),
+                df.iloc[:]['linear_vel'].tolist(),
+                color="red")
+        # set x-axis label
+        ax.set_xlabel("time (s)", fontsize = 14)
+        # set y-axis label
+        ax.set_ylabel("linear vel (mm/s)",
+                    color="red",
+                    fontsize=14)
+
+        # twin object for two different y-axis on the sample plot
+        ax2=ax.twinx()
+        # make a plot with different y-axis using second axis object
+        ax2.plot(df.iloc[:]['Time'].tolist(), df.iloc[:]['angular_vel'].tolist(),color="blue")
+        ax2.set_ylabel("angular vel (rad/s)",color="blue",fontsize=14)
+        plt.show()
+        # save the plot as a file
+        # fig.savefig('two_different_y_axis_for_single_python_plot_with_twinx.jpg',
+        #             format='jpeg',
+        #             dpi=100,
+        #             bbox_inches='tight')
+
+
+
+
+
+
         # Calculate some characteristic of trajectory paterns
         df['traveled_distance'] = (df['linear_vel']*time_step).cumsum()
         df['tortuosity'] = cal_tortuosity(df['x_mm'], df['y_mm'], df['traveled_distance'])

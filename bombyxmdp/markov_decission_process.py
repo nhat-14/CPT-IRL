@@ -166,6 +166,6 @@ class MothMDP(object):
         ax = fig.add_subplot(111, projection='3d')
         x,y,z = np.meshgrid(range(n_states), range(n_actions), range(n_states))
         ax.scatter(x,y,z, c=M.flat)
-        plt.show()
+        # plt.show()
 
         return tp

@@ -73,18 +73,18 @@ if __name__ == "__main__":
     
     # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
     # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
-    features = mdp_demos.groupby('state_i')[['tblank', 'linear_vel', "antennae"]].median()
-    # features['wind'] = features.wind.astype('uint8')
-    features['tblank'] = features.tblank.astype('uint8')
-    features['antennae'] = features.antennae.astype('uint8')
-    features['linear_vel'] = features.linear_vel.astype('uint8')
+    features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
+    features['wind'] = features.wind.astype('uint8')
+    # features['tblank'] = features.tblank.astype('uint8')
+    # features['antennae'] = features.antennae.astype('uint8')
+    # features['linear_vel'] = features.linear_vel.astype('uint8')
     # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
 
     # export all the results (bins, features, transittion matrix) into csv files
     out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
-    export_csv(mdp_edges, 'bin_edges.csv', out_dir)
+    # export_csv(mdp_edges, 'bin_edges.csv', out_dir)
     export_csv(features, 'features.csv', out_dir)
-    export_csv(mdp_demos, 'mdp_demos.csv', out_dir)
+    # export_csv(mdp_demos, 'fmdp_demos.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
         export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)
