@@ -1,9 +1,17 @@
-"""
-Generate state-action trajectories plus other useful stats from Shigaki's 
+"""app.py: Generate state-action trajectories plus other useful stats from Shigaki's 
 2020 tethered moth experiments which incorporate wind stimuli.
 IN: path of directory containing log files (csv format)
-OUT: Csv files with state-action trajectories
-"""
+OUT: Csv files with state-action trajectories"""
+
+__author__      = "Duc-Nhat Luong"
+__copyright__   = "Copyright 2022, The CPT-IRL Project"
+__credits__     = ["Duc-Nhat Luong, Cesar Hernandez-Reyes"]
+__license__     = "MIT"
+__version__     = "2.0.0"
+__maintainer__  = "Duc-Nhat Luong"
+__email__       = "nhat.luongduc@gmail.com"
+__status__      = "Production"
+
 
 import os
 import datetime
@@ -12,6 +20,7 @@ import numpy as np
 import pandas as pd
 import preprocessing
 import markov_decission_process as mdp
+import config
 
 
 def get_timestamp():
@@ -37,8 +46,9 @@ def get_expert_demos(df):
     """
     Encoding the states and actions into discrete space
     """
-    numeric_states = ['log_tblank', 16, True, True, True]
-    categoric_states = ['antennae'] # or ['antennae', 'wind']
+    # name, bins, skewed, use logscale, use_kmeans
+    numeric_states = config.numeric_states
+    categoric_states = config.categoric_states
     mdp_space = mdp.MothMDP(df, numeric_states, categoric_states)
     mdp_space.encode_states()
     mdp_space.encode_actions()
@@ -69,22 +79,16 @@ def export_csv(data, file_name, destination_folder):
 
 if __name__ == "__main__":
     dfs = preprocessing.merge_data(timeout=260)
-    mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())
-    
-    # ['wind', 'hits', 'linear_vel', 'angular_vel', 'log_twhiff', 'lasthit']].mean()
-    # features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
-    features = mdp_demos.groupby('state_i')[['wind', 'angular_vel']].median()
-    features['wind'] = features.wind.astype('uint8')
-    # features['tblank'] = features.tblank.astype('uint8')
-    # features['antennae'] = features.antennae.astype('uint8')
-    # features['linear_vel'] = features.linear_vel.astype('uint8')
-    # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
+    mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())    
+
+    pd.set_option('display.max_rows', len(mdp_demos))
+    print(mdp_demos['action'].value_counts())
+    pd.reset_option('display.max_rows')
 
     # export all the results (bins, features, transittion matrix) into csv files
     out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
-    # export_csv(mdp_edges, 'bin_edges.csv', out_dir)
-    export_csv(features, 'features.csv', out_dir)
-    # export_csv(mdp_demos, 'fmdp_demos.csv', out_dir)
+    export_csv(mdp_edges, 'bin_edges.csv', out_dir)
+    export_csv(mdp_demos, 'fmdp_demos.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
         export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)
