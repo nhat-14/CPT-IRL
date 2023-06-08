@@ -14,7 +14,7 @@ __status__      = "Production"
 
 
 import os
-import datetime
+from datetime import datetime
 from os.path import join
 import numpy as np
 import pandas as pd
@@ -27,8 +27,8 @@ def get_timestamp():
     """
     Return current time in date and time
     """
-    tstamp = datetime.datetime.now()
-    return str(tstamp.strftime('%m%d_%H%M%S'))
+    tstamp = datetime.now()
+    return tstamp.strftime('%m%d_%H%M%S')
 
 
 def get_tblank_bin_edges(mdp_space):
@@ -85,10 +85,9 @@ if __name__ == "__main__":
     print(mdp_demos['action'].value_counts())
     pd.reset_option('display.max_rows')
 
-    # export all the results (bins, features, transittion matrix) into csv files
     out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
-    export_csv(mdp_edges, 'bin_edges.csv', out_dir)
+    # export_csv(mdp_edges, 'bin_edges.csv', out_dir)
     export_csv(mdp_demos, 'fmdp_demos.csv', out_dir)
     for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
         export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)

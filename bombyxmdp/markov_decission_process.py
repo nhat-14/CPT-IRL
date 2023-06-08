@@ -123,14 +123,15 @@ class MothMDP(object):
             in each step time in to one of (surge, turn ccw, turn cw, stop)
         """
         lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        av_lo = self.df['angular_vel'].quantile(0.48)
-        av_hi = self.df['angular_vel'].quantile(0.6)
+        av_lo = self.df['angular_vel'].quantile(0.45)
+        av_hi = self.df['angular_vel'].quantile(0.55)
         
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-        surge = self.df['linear_vel'].gt(lv_min) \
-            & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
+        # surge = self.df['linear_vel'].gt(lv_min) \
+        #     & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
+        surge = self.df['linear_vel'].gt(lv_min)
         turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
         turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 

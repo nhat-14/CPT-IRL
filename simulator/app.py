@@ -7,11 +7,20 @@ import glob
 import random
 import pandas as pd
 from tqdm import tqdm
-from utils import fileIO
 import simulator
-
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from datetime import datetime
+from pathlib import Path
+
+def tstamp():
+    return datetime.now().strftime('%m%d_%H%M%S')
+
+
+def make_dir(basepath, filepath):
+    # Make dir if it doesn't exist
+    Path(os.path.join(basepath, filepath)).mkdir(parents=True, exist_ok=True)
+    return os.path.join(basepath, filepath)
 
 
 def print_simulation_result(performance):
@@ -31,7 +40,7 @@ if __name__ == "__main__":
     env = "smokevid"        #Type of environment
     agt = "silkmoth"        #Type of agent
     controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
-    Nruns = 50              #Number of simulation runs
+    Nruns = 10              #Number of simulation runs
     animation = False       #Draw animation
     input_dir = "bombyxsim-template" # Path of the directory with odor plume data
     save_log = True
@@ -48,8 +57,8 @@ if __name__ == "__main__":
                               controller=controller)
     
     if save_log or plt_traj:
-        out_dir = f'{agt}_{env}_{controller[0]}_{Nruns}runs_{fileIO.tstamp()}'
-        tmp_dir = fileIO.make_dir(input_dir, out_dir)
+        out_dir = f'{agt}_{env}_{controller[0]}_{Nruns}runs_{tstamp()}'
+        tmp_dir = make_dir(input_dir, out_dir)
 
     fig, ax = plt.subplots()
     ax.add_artist(Circle((0,0), 50, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
@@ -81,4 +90,3 @@ if __name__ == "__main__":
     # print(f'Search time: {p.loc[p.success_rate == 1, 'search_time'].mean()} 
     #       +- {p.loc[p.success_rate == 1, 'search_time'].std()}')
     # print('End of script')
-

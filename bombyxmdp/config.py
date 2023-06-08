@@ -3,10 +3,9 @@ This file contains fixed configurations for processing the data
 """
 import os
 
-basepath    = os.getcwd()
-INPUT_DIR   = os.path.join(basepath, "data") # folder has data from VR system
+INPUT_DIR   = os.path.join(os.getcwd(), "data") # folder has data from VR system
 GOAL_RADII  = 50.5 # Distance of agent to source to consider source reached
-WINDOW_SIZE = 1    # Moving average window size: 15 == 0.5s
+WINDOW_SIZE = 15    # Moving average window size: 15 == 0.5s
 
 # name, bins, skewed, use logscale, use_kmeans
 numeric_states      = ['log_tblank', 16, True, True, True]

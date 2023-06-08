@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 
 from utils.geometry import Point
-from agents import silkmoth
+import silkmoth
 from controllers import silkmoth_irl, programmed_behavior
 from envs import smoke_video, wind_tunnel
 

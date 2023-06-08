@@ -13,7 +13,7 @@ def get_linear_vel(data):
     """Get linear velocity based on x, y position vectors
     change during the time step
     """
-    dt = data.at[1, 'Time'] - data.at[0, 'Time']
+    dt = get_time_step(data)
     x = data['x_mm'].to_numpy()
     y = data['y_mm'].to_numpy()
     dR = np.hypot((x[1:] - x[:-1]), (y[1:] - y[:-1]))
@@ -180,22 +180,32 @@ def numerize_wind(data):
     data['wind'] = data['wind'].map(wind_dict)
 
 
+def get_time_step(data):
+    dt = data['Time'].iloc[1] - data['Time'].iloc[0]
+    return dt
+
+
 def cal_whiff_duration(data):
-    dt = data.at[1, 'Time'] - data.at[0, 'Time']
+    dt = get_time_step(data)
     data['twhiff'] = data.groupby(data.antennae.eq(0).cumsum()).cumcount(ascending=True)
     data['twhiff'] = data['twhiff'].mul(dt)
     data['twhiff'] = data.loc[:, 'twhiff'].shift(1, fill_value=0)
+    
+    # Use log scale to reduce skewness
+    twhiff = data['twhiff'].to_numpy()
+    log_twhiff = np.log1p(twhiff)
+    data['log_twhiff'] = log_twhiff
 
 
 def set_time_blank(data):
     # Calculate blank duration. no hit during tblank => no change in hit_cum
-    dt = data.at[1, 'Time'] - data.at[0, 'Time']
+    dt = get_time_step(data)
     hit_cum = data.antennae.gt(0).cumsum()
     data['tblank'] = data.groupby(hit_cum).cumcount(ascending=True)
     data['tblank'] = data['tblank'].mul(dt)
     data['tblank'] = data.loc[:, 'tblank'].shift(1, fill_value=0)
     
-    # Transform blank duration to log scale to reduce skewness
+    # Use log scale to reduce skewness
     data['log_tblank'] = np.log1p(data['tblank'].to_numpy())
 
 
@@ -207,7 +217,7 @@ def extract_hit_related_features(data):
     data['hits_count'] = count_hits(data['whiff'])
     
     # get number of hits per 1 second
-    dt = data.at[1, 'Time'] - data.at[0, 'Time']
+    dt = get_time_step(data)
     data.loc[:, 'hit_rate'] = data['whiff'].rolling(int(1 / dt), min_periods=1).sum()
 
 
@@ -244,12 +254,6 @@ def merge_data(timeout=0):
         set_last_hit(df)
         set_time_blank(df)
         cal_whiff_duration(df)
-
-        # Transform blank duration to log scale to reduce skewness
-        twhiff = df['twhiff'].to_numpy()
-        log_twhiff = np.log1p(twhiff)
-        df['log_twhiff'] = log_twhiff
-
         fill_future_states(df)
         
         # Add column with experiment name as the csv file name
