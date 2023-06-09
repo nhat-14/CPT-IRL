@@ -1,53 +1,50 @@
 import os
 import glob
-from tqdm import tqdm
-from sklearn.preprocessing import KBinsDiscretizer
+from os.path import join
+
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from sklearn.preprocessing import KBinsDiscretizer
+
 import config
 
-def get_linear_vel(x, y, dt):
+def get_linear_vel(data):
     """Get linear velocity based on x, y position vectors
-    Args:
-        x (pandas.Series): vector of x positions
-        y (pandas.Series): vector of y position
-        dt(float): Time step duration
-    Return:
-        dr (pandas.Series) = linear velocity in units of x,y per second
+    change during the time step
     """
-
-    x = x.to_numpy()
-    y = y.to_numpy()
-
-    # result is equivalent to Equivalent to sqrt(x1**2 + x2**2)
-    dR = np.hypot((x[:-1] - x[1:]), (y[:-1] - y[1:]))
+    dt = get_time_step(data)
+    x = data['x_mm'].to_numpy()
+    y = data['y_mm'].to_numpy()
+    dR = np.hypot((x[1:] - x[:-1]), (y[1:] - y[:-1]))
     # insert 0 at 0 index to have the same length with
     dR = np.insert(dR, 0, 0)
-    dR /= dt
-    dR = pd.Series(dR)
-    return dR
+    data['linear_vel'] = dR/dt
 
 
-def get_angular_vel(theta, dt):
-    """Get angular velocity based on x, y position vectors
-    Args:
-        theta (pandas.Series): vector of heading angles (rad)
-        dt (float): Time step duration
-    Return:
-        dTh (pandas.Series) = angular velocity in units of rad per second
+def wrapping_angle_from_0to2pi(angle):
+    mask = angle > np.pi
+    angle[mask] = angle[mask] - 2*np.pi
+    mask = angle < -np.pi
+    angle[mask] = angle[mask] + 2*np.pi
+
+
+def get_angular_vel(data):
+    """Get angular velocity based on vector of heading angles (rad)
+    change during time step duration
     """
-    theta = theta.to_numpy()
-    delta_theta = (theta[:-1] - theta[1:])
-    # avoid abrupt changes from 2*pi to 0 or opposite
-    delta_theta = np.where(delta_theta > 5.0, delta_theta - 2*np.pi, delta_theta)
-    delta_theta = np.where(delta_theta < -5.0, delta_theta + 2*np.pi, delta_theta)
+    dt = data.at[1, 'Time'] - data.at[0, 'Time']
+    theta = data['theta_rad'].to_numpy()
+    delta_theta = (theta[1:] - theta[:-1])
+    wrapping_angle_from_0to2pi(delta_theta)
+    # insert 0 at 0 index to have the same length with
     delta_theta = np.insert(delta_theta, 0, 0)
-    return delta_theta / dt
+    data['angular_vel'] = delta_theta / dt
 
 
 def centerline_deviation(y, dt, y_src=0.):
     """
-        Calculate the deviation of the moth movement along center line (y=0)
+    Calculate the deviation of the moth movement along center line (y=0)
     """
     y = y.to_numpy()
     dy = (y - y_src) * dt
@@ -78,16 +75,16 @@ def get_csv_files():
     in input folder specified in the config.py
     """
     input_dir = config.INPUT_DIR
-    return list(glob.glob(os.path.join(input_dir, '*.csv')))
+    return list(glob.glob(join(input_dir, '*.csv')))
 
 
-def is_source_found(x_pos_log, y_pos_log):
+def check_is_source_found(data):
     """
     Check if the agent reach the source or not
     The source positon is set at coordinate (0,0) 
     """
-    last_x = x_pos_log.iloc[-1]
-    last_y = y_pos_log.iloc[-1]
+    last_x = data['x_mm'].iloc[-1]
+    last_y = data['y_mm'].iloc[-1]
     return np.sqrt(last_x**2 + last_y**2) <= config.GOAL_RADII
 
 
@@ -110,97 +107,47 @@ def count_hits(whiff):
     return np.insert(count, 0, 0).astype('int')
 
 
-def merge_data(timeout=0):
+def get_data_frame_from_csv(file_name):
     """
-    Calculate linear and angular velocity from trajectories and timestamp
+    Return a full formated panda data frame from csv
     """
-    dataframe_list = [] # List of data of each trials
-    traj_len_list = []  # List of the length of each trajectories
-    no_success_runs = 0 # Number of successful trials
-    csv_list = get_csv_files()
+    data = pd.read_csv(file_name)   # Read csv into a dataframe
+    data.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
+    return data
 
-    for csvfile in tqdm(csv_list, ncols=0, desc='Merging csv files'):
-        # Read csv into a dataframe
-        df = pd.read_csv(csvfile)
-        df.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
 
-        # only use the trial which data is recorded within the timeout
-        if df['Time'].iloc[-1] > timeout:
-            continue
+def check_is_timeout(data, time_limit):
+    """
+    Check if an experiment has the run time larger than time limit
+    """
+    return data['Time'].iloc[-1] > time_limit
 
-        # Define time step duration as a convenience variable (0.0333s)
-        time_step = df['Time'].iloc[1]
 
-        # Calculate linear velocity and angular velocity
-        df['linear_vel'] = get_linear_vel(df['x_mm'], df['y_mm'], time_step)
-        df['angular_vel'] = get_angular_vel(df['theta_rad'], time_step)
-        
-        # Calculate some characteristic of trajectory paterns
-        df['traveled_distance'] = (df['linear_vel']*time_step).cumsum()
-        df['tortuosity'] = cal_tortuosity(df['x_mm'], df['y_mm'], df['traveled_distance'])
-        df['cdv'] = centerline_deviation(df['y_mm'], time_step)
-        df['heading'] = np.cos(np.pi - df['theta_rad'].to_numpy())
+def moving_averaged_velocity(data, window_size):
+    data['linear_vel'] = data['linear_vel'].rolling(window_size).mean()
+    data['angular_vel'] = data['angular_vel'].rolling(window_size).mean()
+    data.dropna(inplace=True) # removing all the NULL values 
 
-        # Remap values of odor and wind cues to numeric values
-        antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
-        df['antennae'] = df['antennae'].map(antennae_dict)
-        wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
-        df['wind'] = df['wind'].map(wind_dict)
 
-        # hits_count: count cumulative odor hits
-        # whiff: binary value of odor detection
-        df['whiff'] = (df['antennae'].to_numpy() > 0).astype('uint8')
-        df['hits_count'] = count_hits(df['whiff'])
-        
-        # get number of hits per 1 second
-        df.loc[:, 'hit_rate'] = df['whiff'].rolling(int(1 / time_step)).sum()
+def fill_future_states(data):
+    """
+    Shift one time step to show what is the next state given current state
+    """
+    for state in ["tblank", "log_tblank", "antennae", "hits_count", "wind"]:
+        data[f'{state}_k'] = data.loc[:, state].shift(-1, fill_value=0)
 
-        # Get last hit (Both, Left, Right)
-        df.loc[:, 'lasthit'] = df[df.antennae > 0].antennae
-        df['lasthit'].fillna(method='ffill', inplace=True)
-        # ffill: propagate last hit forward when no recent hits
-        df['lasthit'] = df.loc[:, 'lasthit'].shift(1, fill_value=0)
-        df['lasthit'].fillna(0, inplace=True)
-        df['lasthit'] = df.lasthit.astype('uint8')
 
-        # Calculate blank duration
-        # no hit during tblank so no change in hit_cum
-        hit_cum = df.antennae.gt(0).cumsum()
-        df['tblank'] = df.groupby(hit_cum).cumcount(ascending=True)
-        df['tblank'] = df['tblank'].mul(time_step)
-        df['tblank'] = df.loc[:, 'tblank'].shift(1, fill_value=0)
-        
-        # Transform blank duration to log scale to reduce skewness
-        df['log_tblank'] = np.log1p(df['tblank'].to_numpy())
-
-        # Compute whiff duration
-        df['twhiff'] = df.groupby(df.antennae.eq(0).cumsum()).cumcount(ascending=True)
-        df['twhiff'] = df['twhiff'].mul(time_step)
-        df['twhiff'] = df.loc[:, 'twhiff'].shift(1, fill_value=0)
-
-        # Transform blank duration to log scale to reduce skewness
-        twhiff = df['twhiff'].to_numpy()
-        log_twhiff = np.log1p(twhiff)
-        df['log_twhiff'] = log_twhiff
-
-        # Future states
-        df['tblank_k'] = df.loc[:, 'tblank'].shift(-1, fill_value=0)
-        df['log_tblank_k'] = df.loc[:, 'log_tblank'].shift(-1, fill_value=0)
-        df['antennae_k'] = df.loc[:, 'antennae'].shift(-1, fill_value=0)
-        df['hits_count_k'] = df.loc[:, 'hits_count'].shift(-1, fill_value=0)
-        df['wind_k'] = df.loc[:, 'wind'].shift(-1, fill_value=0)
-
-        # Add column with experiment name as the csv file name
-        df['experiment'] = os.path.basename(csvfile)
-
-        dataframe_list.append(df)
-
-        if is_source_found(df['x_mm'], df['y_mm']):
-            no_success_runs += 1
-
-    dataframe_list = pd.concat(dataframe_list, axis=0, ignore_index=True)
-    print(f'Successful runs: {no_success_runs}/{len(csv_list)}')
-    return dataframe_list
+def set_last_hit(data):
+    """
+    Get last hit type (Both, Left, Right)
+    """
+    # if agent got hit, last is the current hit
+    data.loc[:, 'lasthit'] = data[data.antennae > 0].antennae
+    # ffill: propagate last hit forward when no recent hits
+    data['lasthit'].fillna(method='ffill', inplace=True)
+    data['lasthit'] = data.loc[:, 'lasthit'].shift(1, fill_value=0)
+    data['lasthit'].fillna(0, inplace=True)
+    data['lasthit'] = data.lasthit.astype('uint8')
 
 
 def discretize(dataframe, kbins, strat_kmeans=False):
@@ -215,3 +162,105 @@ def discretize(dataframe, kbins, strat_kmeans=False):
     km_edges = enc.bin_edges_
     km_transformed = enc.transform(dataframe)
     return km_transformed, km_edges
+
+
+def extract_velocity_from_pose(data):
+    get_linear_vel(data)
+    get_angular_vel(data)
+    moving_averaged_velocity(data, config.WINDOW_SIZE)
+
+
+def numerize_antennae(data):
+    antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
+    data['antennae'] = data['antennae'].map(antennae_dict)
+
+
+def numerize_wind(data):
+    wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
+    data['wind'] = data['wind'].map(wind_dict)
+
+
+def get_time_step(data):
+    dt = data['Time'].iloc[1] - data['Time'].iloc[0]
+    return dt
+
+
+def cal_whiff_duration(data):
+    dt = get_time_step(data)
+    data['twhiff'] = data.groupby(data.antennae.eq(0).cumsum()).cumcount(ascending=True)
+    data['twhiff'] = data['twhiff'].mul(dt)
+    data['twhiff'] = data.loc[:, 'twhiff'].shift(1, fill_value=0)
+    
+    # Use log scale to reduce skewness
+    twhiff = data['twhiff'].to_numpy()
+    log_twhiff = np.log1p(twhiff)
+    data['log_twhiff'] = log_twhiff
+
+
+def set_time_blank(data):
+    # Calculate blank duration. no hit during tblank => no change in hit_cum
+    dt = get_time_step(data)
+    hit_cum = data.antennae.gt(0).cumsum()
+    data['tblank'] = data.groupby(hit_cum).cumcount(ascending=True)
+    data['tblank'] = data['tblank'].mul(dt)
+    data['tblank'] = data.loc[:, 'tblank'].shift(1, fill_value=0)
+    
+    # Use log scale to reduce skewness
+    data['log_tblank'] = np.log1p(data['tblank'].to_numpy())
+
+
+def extract_hit_related_features(data):
+    # whiff: binary value of odor detection
+    data['whiff'] = (data.antennae.to_numpy() > 0).astype('uint8')
+
+    # hits_count: count cumulative odor hits
+    data['hits_count'] = count_hits(data['whiff'])
+    
+    # get number of hits per 1 second
+    dt = get_time_step(data)
+    data.loc[:, 'hit_rate'] = data['whiff'].rolling(int(1 / dt), min_periods=1).sum()
+
+
+def merge_data(timeout=0):
+    """
+    Calculate linear and angular velocity from trajectories and timestamp
+    """
+    dataframe_list = [] # List of data of each trials
+    n_success_runs = 0
+
+    csv_list = get_csv_files()
+    for csvfile in tqdm(csv_list, ncols=0, desc='Merging csv files'):
+        # only use the trial which data is recorded within the timeout
+        df = get_data_frame_from_csv(csvfile)
+        if check_is_timeout(df, timeout):
+            continue
+        
+        if check_is_source_found(df):
+            n_success_runs += 1
+
+        # Define time step duration (0.0333s)
+        time_step = df['Time'].iloc[1]
+        extract_velocity_from_pose(df)
+        
+        # Calculate some characteristic of trajectory paterns
+        df['traveled_distance'] = (df['linear_vel']*time_step).cumsum()
+        df['tortuosity'] = cal_tortuosity(df['x_mm'], df['y_mm'], df['traveled_distance'])
+        df['cdv'] = centerline_deviation(df['y_mm'], time_step)
+        df['heading'] = np.cos(np.pi - df['theta_rad'].to_numpy())
+
+        numerize_antennae(df)
+        numerize_wind(df)
+        extract_hit_related_features(df)
+        set_last_hit(df)
+        set_time_blank(df)
+        cal_whiff_duration(df)
+        fill_future_states(df)
+        
+        # Add column with experiment name as the csv file name
+        df['experiment'] = os.path.basename(csvfile)
+        dataframe_list.append(df)
+
+    dataframe_list = pd.concat(dataframe_list, ignore_index=True)
+
+    print(f'Successful runs: {n_success_runs}/{len(csv_list)}')
+    return dataframe_list

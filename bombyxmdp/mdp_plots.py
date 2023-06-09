@@ -1,15 +1,19 @@
+import glob
+import os
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import seaborn as sns
-sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 import numpy as np
 import pandas as pd
-import glob
-import os
 import h5py
 from tqdm import tqdm
+
+import config
+
+sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
 class MdpPlots(object):
     def __init__(self, style, context, figsize, dpi=300, tight=True):
@@ -641,26 +645,23 @@ class MdpPlots(object):
         plt.show()
 
     
-
-
-
-
-
-# Plot all the moth trajectories
 def plot_moth_trajectories(df, xlim=(0, 600), ylim=(-360, 360), src=(0, 0, 50), output=None):
+    """
+    Plot all the moth trajectories
+    """
     srcx, srcy, goal_radius = src
     sns.set_style('ticks')
     sns.set_context('paper')
-    fig, ax = plt.subplots(figsize=(3.4, 2.83))
+    fig, ax = plt.subplots()
 
     ax.add_artist(Circle((srcx, srcy), goal_radius, color='r', 
         fill=False, linestyle='--', linewidth=0.5, zorder=1))
 
     for i, g in df.groupby((df.Time.diff() < 0).cumsum()):
-        ax.plot(g.x_mm, g.y_mm, linewidth=.2, alpha=0.5, color='k', zorder=3)
-        ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1], color='g', s=5)
+        ax.plot(g.x_mm, g.y_mm, linewidth=0.5, alpha=0.5, color='b', zorder=3)
+        ax.scatter(g.x_mm.iloc[-1], g.y_mm.iloc[-1], color='r', s=4)
 
-    ax.scatter(srcx, srcy, marker='*', c='k')
+    ax.scatter(srcx, srcy, marker='*', c='b')
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
     ax.set_xlabel('x (mm)')
@@ -677,7 +678,7 @@ def plot_moth_xyjoint(df, xlim=(0, 600), ylim=(-360, 360), src=(0, 0, 50), outpu
     fig, ax = plt.subplots(figsize=(3.4, 2.83))
     ax = sns.jointplot(x='x_mm', y='y_mm',
                         data=df, kind='kde',
-                        xlim, ylim)
+                        xlim=xlim, ylim=xlim)
     fig.tight_layout()
     plt.savefig(output + '_moth_xyjoint', dpi=300)
     plt.show()

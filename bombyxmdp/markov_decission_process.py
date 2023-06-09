@@ -1,6 +1,13 @@
 import numpy as np
 import pandas as pd
 import preprocessing as prep
+import matplotlib.pyplot as plt
+
+def print_full_dataframe(data):
+    pd.set_option('display.max_rows', len(data))
+    print(data)
+    pd.reset_option('display.max_rows')
+
 
 class NumericState(object):
     def __init__(self, name, bins, skewed, logscale, use_kmeans):
@@ -19,7 +26,7 @@ class MothMDP(object):
         self.num_state_bits = 0
         self.digi_edges = {}
 
-    def _digitize(self, X, edges):
+    def digitize(self, X, edges):
         bins = len(edges) - 1
         rtol = 1.e-5
         atol = 1.e-8
@@ -56,7 +63,7 @@ class MothMDP(object):
         edges = np.append(edges[0], vmax)
 
         for i, state_digi in enumerate(states_digi):
-            self.df.loc[:, state_digi] = self._digitize(self.df[states_k[i]].to_numpy(), edges)
+            self.df.loc[:, state_digi] = self.digitize(self.df[states_k[i]].to_numpy(), edges)
 
         if state.logscale:
             edges = np.expm1(edges)
@@ -116,14 +123,15 @@ class MothMDP(object):
             in each step time in to one of (surge, turn ccw, turn cw, stop)
         """
         lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
-        av_lo = self.df['angular_vel'].quantile(0.40)
-        av_hi = self.df['angular_vel'].quantile(0.60)
+        av_lo = self.df['angular_vel'].quantile(0.45)
+        av_hi = self.df['angular_vel'].quantile(0.55)
         
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
-        surge = self.df['linear_vel'].gt(lv_min) \
-            & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
+        # surge = self.df['linear_vel'].gt(lv_min) \
+        #     & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
+        surge = self.df['linear_vel'].gt(lv_min)
         turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
         turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
@@ -134,9 +142,12 @@ class MothMDP(object):
         self.df['action'] = self.df.action.astype('uint8')
 
     def get_transition_probability(self):
+        """
+        Return the transition probability
+        """
         t_ik = self.df.groupby(['state_i', 'action','state_k'])
         t_ik = t_ik.state_k.count()
-
+        # print_full_dataframe(t_ik)
         n_states = len(self.df['state_cat_i'].unique()) * self.num_state_bits
         n_actions = len(t_ik.index.levels[1])
 
@@ -158,8 +169,7 @@ class MothMDP(object):
                 tp[i, j] = tp[i, j] / denom if denom else 0
 
 
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
+        
 
         M = tp
         fig = plt.figure()

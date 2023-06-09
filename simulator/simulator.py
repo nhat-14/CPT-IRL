@@ -11,19 +11,13 @@ import pandas as pd
 import numpy as np
 
 from utils.geometry import Point
-from agents import silkmoth
+import silkmoth
 from controllers import silkmoth_irl, programmed_behavior
 from envs import smoke_video, wind_tunnel
 
 class Simulator(object):
-    def __init__(self,
-                input_dir,
-                config_file,
-                tlim,
-                env='smokevid',
-                agt='silkmoth',
-                controller='KPB'):
-
+    def __init__(self, input_dir, config_file, tlim, env='smokevid',
+                agt='silkmoth', controller='KPB'):
         self.input_dir = input_dir
         with open(config_file) as f:
             self.cfg = json.load(f)
@@ -139,7 +133,6 @@ class Simulator(object):
         plt.savefig(f, dpi=300)
 
     def run(self, plume, draw_animation=False, save_log=False):
-
         agent = self.set_agent()
         env = self.set_env(plume)
         controller = self.set_controller()
@@ -156,7 +149,6 @@ class Simulator(object):
             fig, img, line = self.set_animation(env)
 
         for t in range(self.Nsteps - 1):
-
             if draw_animation:
                 img.set_data(env.plume[t])
                 line.set_data(x_ls, y_ls)
@@ -164,7 +156,6 @@ class Simulator(object):
                 fig.canvas.flush_events()
 
             if self.off_grid(agent.pos, agent.antenna_length):
-                # print(colorize('Off grid', 'red'))
                 found_source = np.nan
                 break
 
@@ -197,12 +188,6 @@ class Simulator(object):
 
             if save_log:
                 log.append([t/self.fps, antennae_hit] + agent.log_step + controller.log_step)
-
-            
-            # print('t: {:.4f}, h:{}, {}, {}'.format(t / self.fps,
-            #                                         antennae_hit,
-            #                                         str(agent),
-            #                                         str(controller)))
 
         traj = pd.DataFrame({'x': x_ls, 'y':y_ls})
 

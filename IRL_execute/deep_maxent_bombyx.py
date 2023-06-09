@@ -4,7 +4,6 @@ Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
 """
 
 import glob
-import os
 from datetime import datetime
 from pathlib import Path
 from os.path import join
@@ -19,6 +18,7 @@ import neo_mothworld
 from myirl import value_iteration
 from myirl import deep_maxent
 import config as cfg
+from decision_tree_regression import DecisionTreeRegressor
 
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
 
@@ -28,10 +28,10 @@ def read_trajectories():
     of csv files and L is the trajectory length.
     2 means two columns (of states-actions)
     """
-    csvs = load_csv_files()
+    csvs = load_csv_files('[!f]*.csv')
     trajs = []
     for csv_file in csvs:
-        print(f'Working on: {os.path.basename(csv_file)}')
+        # print(f'Working on: {os.path.basename(csv_file)}')
         dataframe = pd.read_csv(csv_file, nrows=cfg.trajectory_len)
 
         # Handle data as numpy array
@@ -54,33 +54,37 @@ def read_trajectories():
     return trajs
 
 
-def plot_reward_function(df, yticks, save_path, _annot=True):
+def get_mdp_grid_world():
+    trans_prob = load_state_transition_probability()
+    return neo_mothworld.MothWorld(trans_prob) # a mothworld object
+
+
+def plot_reward_function(data, save_path=None, _annot=True):
     """Plot reward function for each state
-
-        Args:
+    Args:
             df (pandas.DataFrame): Data from csv
-            yticks (list of str): Labels for y-ticks
-        """
-
+    """
+    tmp_dir = join(cfg.input_dir, save_path)
+    plot_title = f'Epochs: {cfg.epochs}, Trajectory length: {cfg.trajectory_len}, \
+        Discount: {cfg.discount}, Learning rate: {cfg.learning_rate}'
     sns.set_style('ticks')
     sns.set_context('paper')
 
     fig, ax = plt.subplots(figsize=(7, 4))
-
     ax = sns.heatmap(
-        df.T,
+        data,
         # center=0,
         cmap='magma',
-        yticklabels=yticks,
+        yticklabels=cfg.substate_ticks[cfg.state_names[1]],
         annot=_annot,
         cbar_kws={'label': 'Reward'})
-    ax.invert_yaxis()
-
+    
     ax.set_xlabel('Blank duration')
     ax.set_ylabel('Antennae')
 
     fig.tight_layout()
-    # plt.savefig(save_path, dpi=300)
+    fig.suptitle(plot_title)
+    plt.savefig(join(tmp_dir, 'Reward.png'), dpi=300)
     plt.show()
 
 
@@ -91,28 +95,6 @@ def plot_policy(out_dir):
 
     sns.set_style('ticks')
     sns.set_context('paper')
-
-    fig, ax_r = plt.subplots(figsize=(7, 4))
-
-    ax_r = sns.heatmap(ex_reward.T,
-                        center=0,
-                        cmap='magma',
-                        yticklabels=cfg.substate_ticks[cfg.state_names[1]],
-                        annot=True,
-                        cbar_kws={'label': 'Reward'})
-
-    ax_r.set_xlabel(cfg.state_labels[cfg.state_names[0]])
-    ax_r.set_ylabel(cfg.state_labels[cfg.state_names[1]])
-    ax_r.invert_yaxis()
-
-    if cfg["draw_subgrid"]:
-        ax_r.hlines(cfg["subgrid_ticks"], *ax_r.get_ylim(),
-                    linestyle='--', linewidth=0.5, color='w')
-
-    fig.suptitle(plot_title)
-
-    plt.savefig(join(tmp_dir, 'Reward.png'), dpi=300)
-    plt.show()
 
     fig, ax_q = plt.subplots(
         1, mothworld.n_actions, figsize=(12, 6.8), sharey=True)
@@ -142,22 +124,20 @@ def plot_policy(out_dir):
     print('Plots saved to disk')
 
 
-def save_csv(out_dir):
-    tmp_dir = join(cfg.input_dir, out_dir)
-
+def save_csv(out_folder):
     # Saving reward to csv
-    pd.DataFrame(ex_reward).to_csv(join(tmp_dir, 'Reward.csv'))
+    pd.DataFrame(ex_reward).to_csv(join(out_folder, 'Reward.csv'))
     
-    np.savetxt(join(tmp_dir,'simple_policy.csv'), simple_policy, delimiter=',', fmt='%d')
-    np.savetxt(join(tmp_dir,'moth_policy.csv'), moth_policy, delimiter=',')
+    np.savetxt(join(out_folder,'simple_policy.csv'), simple_policy, delimiter=',', fmt='%d')
+    np.savetxt(join(out_folder,'moth_policy.csv'), moth_policy, delimiter=',')
 
     # Saving policy to h5 and csv
-    with h5py.File(join(tmp_dir, 'policy.h5'), 'w') as hf:
+    with h5py.File(join(out_folder, 'policy.h5'), 'w') as hf:
         hf.create_dataset("policy",  data=moth_policy.reshape(mothworld.n_actions, *cfg.n_sub_states))
 
     for i in range(len(moth_policy)):
         pd.DataFrame(moth_policy[i].reshape(cfg.n_sub_states)).to_csv(
-            join(tmp_dir, 'policy_{0}.csv'.format(cfg.action_labels[i])))
+            join(out_folder, f'policy_{cfg.action_labels[i]}.csv'))
 
     print('Reward and policy saved to disk')
 
@@ -169,13 +149,13 @@ def get_current_time():
     return datetime.now().strftime('%m%d_%H%M%S')
 
 
-def load_csv_files():
+def load_csv_files(csv_name):
     """
     return a list of absolute path string. Each path point to a csv file
     (except the feature.csv) from input_dir containing trajectories data.
     """
     # Load csv logs except the feature.csv
-    paths = get_file_path('[!f]*.csv')
+    paths = get_file_path(csv_name)
     paths_with_full_name = glob.glob(paths)
     return paths_with_full_name
 
@@ -204,68 +184,131 @@ def create_output_folder():
     dir_name = generate_output_folder_name()
     path_obj = Path(join(cfg.input_dir, dir_name))
     path_obj.mkdir(parents=True, exist_ok=True)
-    return dir_name
+    return path_obj
 
 
-def initialize_feature_matrix():
+def load_state_transition_probability():
     """
-    Get feature dataframe from the features.csv generated 
+    Return the state transition probability in numpy array type
+    which is generate in the data preprocessing step in bombyxmdp file
+    """
+    path = get_file_path('trans_prob.npy')
+    return np.load(path)
+
+
+def initilize_regularization():
+    """
+    initilize regularization parameter L1 and L2
+    check Whether to use L2 regularization in the gradient descent l2reg
+    """
+    if cfg.l2reg:
+        return tuple(cfg.l2reg)
+    else:
+        return (0,0)
+    
+
+def assign_reward_along_trajectory(lookup):
+    """
+    Having the reward function, we use it to assign the
+    state reward in each step of the moth demostration
+    """
+    data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
+    data['reward'] = data.state_i.map(lookup.set_index('state').reward)
+    return data
+
+
+def feature_fitting(reward_matrix):
+    """
+    Using decision tree regression to auto select the suitable feature vector
+    """
+    reward_table = pd.DataFrame({'reward': reward_matrix[:]})
+    reward_table['state'] = reward_table.index
+    full_demos_data = assign_reward_along_trajectory(reward_table)
+    feature_name_list = ['wind', 'linear_vel', 'angular_vel', "tblank", "antennae", "whiff", "hit_rate", "lasthit", "reward"]
+    small_data = full_demos_data[feature_name_list]
+    data_len = 3000
+    X = small_data.iloc[:data_len, :-1].values
+    Y = small_data.iloc[:data_len, -1].values.reshape(-1,1)
+    regressor = DecisionTreeRegressor(min_samples_split=3, max_depth=3)
+    regressor.fit(X,Y)
+    regressor.print_tree()
+    regressor.list_conditional_node()
+    print(regressor.get_node_list())
+    
+    next_feature_set = []
+    for i, name in enumerate(feature_name_list):
+        for j in regressor.get_node_list():
+            if j == i:
+                next_feature_set.append(name)
+    print(next_feature_set)
+    result = full_demos_data.groupby('state_i')[next_feature_set].median()
+    # return result.astype('uint8')
+    return result
+
+
+def get_feature_matrix():
+    """
+    Get feature dataframe from the concated demos data from the moth generated 
     from data processing step in bombyxmdp
     """
-    feature_path = get_file_path('features.csv')
-    matrix = pd.read_csv(feature_path).values
-    print(f'Shape of feature matrix: {matrix.shape}')
+    matrix = np.eye(cfg.n_states)   # unit vector
+    if not cfg.auto_select_feature:
+        full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
+        # mean() or median() is better?
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel', 'tblank', 'antennae']].median()
+        # matrix = full_demos_data.groupby('state_i')[['linear_vel', 'tblank', 'antennae']].median()
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
+        # matrix['wind'] = matrix['wind'].astype('uint8')
+        # matrix = matrix.astype('uint8')
+        # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
     return matrix
 
-
 if __name__ == "__main__":
-    # Load the state transition probabilities
-    trans_prob = np.load(get_file_path('trans_prob.npy'))
-
-    # Construct a mothworld object
-    mothworld = neo_mothworld.MothWorld(trans_prob)
-
-    feature_matrix = initialize_feature_matrix()
-
-    # Whether to use L2 regularization in the gradient descent l2reg
-    (l1, l2) = tuple(cfg.l2reg) if cfg.l2reg else (0,0)
-    
+    l1, l2 = initilize_regularization()
     trajectories = read_trajectories()
+    feature_matrix = get_feature_matrix()
+    mothworld = get_mdp_grid_world()
     
-    NeuronNet_structure = (feature_matrix.shape[1],) + cfg.structure
-    # Calculating reward
-    r = deep_maxent.irl(NeuronNet_structure,
-                        feature_matrix,
-                        mothworld.n_actions,
-                        mothworld.discount,
-                        mothworld.transition_probability,
-                        trajectories,
-                        cfg.epochs,
-                        cfg.learning_rate,
-                        l1=l1,
-                        l2=l2)
+    interation = cfg.fitting_loop if cfg.auto_select_feature else 1
+    for i in range(interation):
+        print(f"===Feature fitting interation {i}====")
+        NeuronNet_structure = (feature_matrix.shape[1],) + cfg.NNstructure
+
+        # Calculating reward
+        r = deep_maxent.irl(NeuronNet_structure,
+                            feature_matrix,
+                            mothworld.n_actions,
+                            mothworld.discount,
+                            mothworld.transition_probability,
+                            trajectories,
+                            cfg.epochs,
+                            cfg.learning_rate,
+                            l1=l1,
+                            l2=l2)
+        
+        if cfg.auto_select_feature:
+            feature_matrix = feature_fitting(r)
+    #===========================================================================
 
     # Reshape reward
-    ex_reward = r.reshape(*cfg.n_sub_states)
-    mean_reward = [round(np.mean(ex_reward[:, i]), 2) for i in range(ex_reward.shape[1])]
-    print(f'Mean reward: {mean_reward}')
+    ex_reward = r.reshape(cfg.n_sub_states)
 
     # Store extracted Q value and Calculating policy
-    moth_policy = value_iteration.find_policy(mothworld.n_states, 
+    moth_policy = value_iteration.find_policy(mothworld.n_states,
                                               mothworld.n_actions,
-                                              mothworld.transition_probability, 
+                                              mothworld.transition_probability,
                                               r,
-                                              cfg.discount, 
+                                              cfg.discount,
                                               threshold=1e-2)
     
-    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(mothworld.n_states)])
-    simple_policy = simple_policy.reshape(mothworld.substate).T
 
-    # Save policy into csv
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
+    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(cfg.n_states)])
+    simple_policy = simple_policy.reshape(cfg.n_sub_states)
+    
     moth_policy = moth_policy.T
-    print(f'Policy: {moth_policy.shape}\n{moth_policy}')
-
     output_folder = create_output_folder()
     save_csv(output_folder)
     # plot_policy(output_folder)
+    plot_reward_function(ex_reward, output_folder)
