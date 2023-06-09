@@ -26,7 +26,7 @@ substate_ticks  = {
 discount            = 0.9       # Discount factor
 epochs              = 200       # Training epochs for the gradient descent
 learning_rate       = 0.01
-trajectory_len      = 109
+trajectory_len      = 109 #1400
 NNstructure         = (4, 3)    # Neural network structure tuple
 
 # Action related configurations
@@ -39,5 +39,5 @@ draw_subgrid = False
 l2reg = False
 subgrid_ticks = [4, 8, 12]
 
-use_feature_auto_select = True
-fitting_loop = 12
+auto_select_feature = False
+fitting_loop = 10

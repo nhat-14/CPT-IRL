@@ -54,21 +54,9 @@ def read_trajectories():
     return trajs
 
 
-def get_feature_matrix():
-    """
-    Get feature dataframe from the concated demos data from the moth generated 
-    from data processing step in bombyxmdp
-    """
-    matrix = np.eye(cfg.n_states)   # unit vector
-    if not cfg.use_feature_auto_select:
-        full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
-        # mean() or median() is better?
-        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
-        matrix = full_demos_data.groupby('state_i')[['linear_vel', 'hit_rate']].median()
-        # matrix['wind'] = matrix['wind'].astype('uint8')
-        # matrix = matrix.astype('uint8')
-        # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
-    return matrix
+def get_mdp_grid_world():
+    trans_prob = load_state_transition_probability()
+    return neo_mothworld.MothWorld(trans_prob) # a mothworld object
 
 
 def plot_reward_function(data, save_path=None, _annot=True):
@@ -236,7 +224,7 @@ def feature_fitting(reward_matrix):
     reward_table = pd.DataFrame({'reward': reward_matrix[:]})
     reward_table['state'] = reward_table.index
     full_demos_data = assign_reward_along_trajectory(reward_table)
-    feature_name_list = ['wind', 'linear_vel', 'angular_vel', "whiff", "hit_rate", "lasthit", "reward"]
+    feature_name_list = ['wind', 'linear_vel', 'angular_vel', "tblank", "antennae", "whiff", "hit_rate", "lasthit", "reward"]
     small_data = full_demos_data[feature_name_list]
     data_len = 3000
     X = small_data.iloc[:data_len, :-1].values
@@ -258,24 +246,33 @@ def feature_fitting(reward_matrix):
     return result
 
 
-def generate_raw_policy(state_action_prob):
-    raw_policy = []
-    for action_prob in state_action_prob:
-        selected_action = np.random.choice(cfg.actions, p=action_prob)
-        raw_policy.append(selected_action)
-    return np.array(raw_policy)
-
+def get_feature_matrix():
+    """
+    Get feature dataframe from the concated demos data from the moth generated 
+    from data processing step in bombyxmdp
+    """
+    matrix = np.eye(cfg.n_states)   # unit vector
+    if not cfg.auto_select_feature:
+        full_demos_data = pd.read_csv(join(cfg.input_dir, "fmdp_demos.csv"))
+        # mean() or median() is better?
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel', 'tblank', 'antennae']].median()
+        # matrix = full_demos_data.groupby('state_i')[['linear_vel', 'tblank', 'antennae']].median()
+        # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
+        # matrix['wind'] = matrix['wind'].astype('uint8')
+        # matrix = matrix.astype('uint8')
+        # features['angular_vel'] = np.sign(features.angular_vel).astype('int')
+    return matrix
 
 if __name__ == "__main__":
-    trans_prob = load_state_transition_probability()
     l1, l2 = initilize_regularization()
     trajectories = read_trajectories()
     feature_matrix = get_feature_matrix()
-    mothworld = neo_mothworld.MothWorld(trans_prob) # a mothworld object
+    mothworld = get_mdp_grid_world()
     
-    interation = cfg.fitting_loop if cfg.use_feature_auto_select else 1
+    interation = cfg.fitting_loop if cfg.auto_select_feature else 1
     for i in range(interation):
-        print(f"===Feature fitting at interation {i}!====")
+        print(f"===Feature fitting interation {i}====")
         NeuronNet_structure = (feature_matrix.shape[1],) + cfg.NNstructure
 
         # Calculating reward
@@ -290,10 +287,9 @@ if __name__ == "__main__":
                             l1=l1,
                             l2=l2)
         
-        if cfg.use_feature_auto_select:
+        if cfg.auto_select_feature:
             feature_matrix = feature_fitting(r)
     #===========================================================================
-
 
     # Reshape reward
     ex_reward = r.reshape(cfg.n_sub_states)
@@ -306,16 +302,13 @@ if __name__ == "__main__":
                                               cfg.discount,
                                               threshold=1e-2)
     
-    
-    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(cfg.n_states)])
-    # simple_policy = generate_raw_policy(moth_policy)
-    simple_policy = simple_policy.reshape(cfg.n_sub_states)
-    
-    # Save policy into csv
+
     pd.DataFrame(moth_policy).to_csv('raw_policy.csv', index=False)
+    simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(cfg.n_states)])
+    simple_policy = simple_policy.reshape(cfg.n_sub_states)
     
     moth_policy = moth_policy.T
     output_folder = create_output_folder()
     save_csv(output_folder)
-    plot_policy(output_folder)
+    # plot_policy(output_folder)
     plot_reward_function(ex_reward, output_folder)
