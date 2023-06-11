@@ -40,7 +40,7 @@ if __name__ == "__main__":
     env = "smokevid"        #Type of environment
     agt = "silkmoth"        #Type of agent
     controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
-    Nruns = 10              #Number of simulation runs
+    Nruns = 50              #Number of simulation runs
     animation = False       #Draw animation
     input_dir = "bombyxsim-template" # Path of the directory with odor plume data
     save_log = True

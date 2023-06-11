@@ -125,13 +125,22 @@ class MothMDP(object):
         lv_min = self.df['linear_vel'].mean() - self.df['linear_vel'].std()
         av_lo = self.df['angular_vel'].quantile(0.45)
         av_hi = self.df['angular_vel'].quantile(0.55)
+
+        lv_min = self.df['linear_vel'].quantile(0.3)
+        av_lo = -0.15
+        av_hi = 0.15
         
         print(f'Min. linear vel. : {lv_min:.5f}')
         print(f'Angular vel. range: ({av_lo:.5f}, {av_hi:.5f})')
 
+        surge = self.df['linear_vel'].gt(lv_min) \
+            & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
+
         # surge = self.df['linear_vel'].gt(lv_min) \
-        #     & self.df['angular_vel'].between(av_lo, av_hi, inclusive="both")
-        surge = self.df['linear_vel'].gt(lv_min)
+        #     & self.df['angular_vel'].between(-0.2, 0.2, inclusive="both")
+
+        # surge = self.df['linear_vel'].gt(lv_min)
+
         turn_ccw = ~(surge) & (self.df['angular_vel'] > av_hi)
         turn_cw = ~(surge) & (self.df['angular_vel'] < av_lo)
 
@@ -167,9 +176,6 @@ class MothMDP(object):
             for j in range(tp.shape[1]):
                 denom = np.sum(tp[i, j])
                 tp[i, j] = tp[i, j] / denom if denom else 0
-
-
-        
 
         M = tp
         fig = plt.figure()

@@ -132,6 +132,7 @@ class Simulator(object):
         ax.set_aspect('equal')
         plt.savefig(f, dpi=300)
 
+
     def run(self, plume, draw_animation=False, save_log=False):
         agent = self.set_agent()
         env = self.set_env(plume)
