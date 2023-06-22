@@ -257,7 +257,7 @@ def get_feature_matrix():
         # mean() or median() is better?
         # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
         # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel', 'tblank', 'antennae']].median()
-        # matrix = full_demos_data.groupby('state_i')[['linear_vel', 'tblank', 'antennae']].median()
+        matrix = full_demos_data.groupby('state_i')[['linear_vel', 'tblank', 'antennae']].median()
         # matrix = full_demos_data.groupby('state_i')[['wind', 'angular_vel']].median()
         # matrix['wind'] = matrix['wind'].astype('uint8')
         # matrix = matrix.astype('uint8')

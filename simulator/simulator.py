@@ -16,20 +16,18 @@ from controllers import silkmoth_irl, programmed_behavior
 from envs import smoke_video, wind_tunnel
 
 class Simulator(object):
-    def __init__(self, input_dir, config_file, tlim, env='smokevid',
+    def __init__(self, input_dir, smoke_env, tlim, env='smokevid',
                 agt='silkmoth', controller='KPB'):
         self.input_dir = input_dir
-        with open(config_file) as f:
-            self.cfg = json.load(f)
-
-        self.fps = self.cfg["FPS"]
+        self.smoke_env = smoke_env
+        self.fps = self.smoke_env["FPS"]
         self._env = env
         self._agt = agt
         self._ctrl = controller
         self.tlim = tlim
         self.performance = {'success_rate': [], 'search_time': []}
         self.Nsteps = int(np.round(self.tlim * self.fps))
-        self.wind_angle = self.cfg["wind_angle"]
+        self.wind_angle = self.smoke_env["wind_angle"]
         self.bin_edges = None
         self.policy = None
         self.irl_num_states = None
@@ -37,7 +35,7 @@ class Simulator(object):
         if self._ctrl[0] == 'IRL':
             self.bin_edges = self.get_bin_edges()
             self.policy = self.get_policy()
-            self.irl_num_states = self.cfg["irl"]["num_states"]
+            self.irl_num_states = self.smoke_env["irl"]["num_states"]
 
     def get_bin_edges(self):
         f = os.path.join(self.input_dir, 'bin_edges', f'{self._ctrl[1]}.csv')
@@ -51,9 +49,9 @@ class Simulator(object):
         return policy
 
     def set_agent(self):
-        p0 = self.cfg["init_pose"]
-        if self.cfg['random_start']:
-            eps = self.cfg['init_pose_eps']
+        p0 = self.smoke_env["init_pose"]
+        if self.smoke_env['random_start']:
+            eps = self.smoke_env['init_pose_eps']
             p0 = [(p0[i] + np.random.uniform(-eps[i], eps[i]))
                   for i in range(len(eps))]
             # e = np.random.normal(0., 10.)
@@ -64,7 +62,7 @@ class Simulator(object):
         }.get(self._agt, None)
 
     def set_env(self, plume):
-        cfg = self.cfg['env']
+        cfg = self.smoke_env['env']
 
         return {
             'smokevid':
@@ -96,7 +94,7 @@ class Simulator(object):
 
         ax.add_artist(
             plt.Circle((env.mmsrc[0], env.mmsrc[1]),
-                       self.cfg["env"]["goalr"],
+                       self.smoke_env["env"]["goalr"],
                        color='yellow',
                        fill=False,
                        linestyle='--'))
@@ -106,20 +104,20 @@ class Simulator(object):
         return fig, img, line
 
     def off_grid(self, p: Point, m):
-        xs = self.cfg['env']['xspace']
-        ys = self.cfg['env']['yspace']
+        xs = self.smoke_env['env']['xspace']
+        ys = self.smoke_env['env']['yspace']
         og = not ((min(xs) + m < p.x < max(xs) - m) and
                 (min(ys) + m < p.y < max(ys) - m))
         return og
 
     def reached_goal(self, p: Point):
-        radius = self.cfg['env']['goalr']
+        radius = self.smoke_env['env']['goalr']
         return (np.sqrt(p.x**2 + p.y**2) < radius)
 
     def plot_trajectory(self, traj, f):
 
-        xsrc, ysrc = tuple(self.cfg['env']['srcpos'])
-        radius = self.cfg['env']['goalr']
+        xsrc, ysrc = tuple(self.smoke_env['env']['srcpos'])
+        radius = self.smoke_env['env']['goalr']
 
         fig, ax = plt.subplots()
         ax.add_artist(Circle((xsrc, ysrc), radius, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
@@ -127,10 +125,11 @@ class Simulator(object):
         ax.plot(traj.iloc[:,0], traj.iloc[:,1], zorder=3)
         ax.scatter(xsrc, ysrc, marker='*', c='k')
 
-        ax.set_xlim(self.cfg['env']['xspace'])
-        ax.set_ylim(self.cfg['env']['yspace'])
+        ax.set_xlim(self.smoke_env['env']['xspace'])
+        ax.set_ylim(self.smoke_env['env']['yspace'])
         ax.set_aspect('equal')
         plt.savefig(f, dpi=300)
+
 
     def run(self, plume, draw_animation=False, save_log=False):
         agent = self.set_agent()
@@ -142,8 +141,8 @@ class Simulator(object):
         last_hit = 0
         dt = 1 / self.fps
         found_source = 0
-        hit_noise = self.cfg['hit_noise']
-        hit_eps = np.random.binomial(1, self.cfg['hit_probability'])
+        hit_noise = self.smoke_env['hit_noise']
+        hit_eps = np.random.binomial(1, self.smoke_env['hit_probability'])
 
         if draw_animation:
             fig, img, line = self.set_animation(env)
