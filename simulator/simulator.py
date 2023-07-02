@@ -6,7 +6,6 @@ import os
 import json
 import h5py
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
 import pandas as pd
 import numpy as np
 
@@ -14,10 +13,10 @@ from utils.geometry import Point
 import silkmoth
 from controllers import silkmoth_irl, programmed_behavior
 from envs import smoke_video, wind_tunnel
+from config import obstacle
 
 class Simulator(object):
-    def __init__(self, input_dir, smoke_env, tlim, env='smokevid',
-                agt='silkmoth', controller='KPB'):
+    def __init__(self, input_dir, smoke_env, tlim, env, agt, controller):
         self.input_dir = input_dir
         self.smoke_env = smoke_env
         self.fps = self.smoke_env["FPS"]
@@ -32,21 +31,22 @@ class Simulator(object):
         self.policy = None
         self.irl_num_states = None
 
-        if self._ctrl[0] == 'IRL':
-            self.bin_edges = self.get_bin_edges()
-            self.policy = self.get_policy()
-            self.irl_num_states = self.smoke_env["irl"]["num_states"]
+    #     if self._ctrl[0] == 'IRL':
+    #         self.bin_edges = self.get_bin_edges()
+    #         self.policy = self.get_policy()
+    #         self.irl_num_states = self.smoke_env["irl"]["num_states"]
 
-    def get_bin_edges(self):
-        f = os.path.join(self.input_dir, 'bin_edges', f'{self._ctrl[1]}.csv')
-        bin_edges = pd.read_csv(f)
-        return bin_edges
+    # def get_bin_edges(self):
+    #     print(self._ctrl)
+    #     f = os.path.join(self.input_dir, 'bin_edges', f'{self._ctrl[1]}.csv')
+    #     bin_edges = pd.read_csv(f)
+    #     return bin_edges
 
-    def get_policy(self):
-        f = os.path.join(self.input_dir, 'irl_policies', f'{self._ctrl[2]}.h5')
-        with h5py.File(f, 'r') as hf:
-            policy = hf['policy'][:]
-        return policy
+    # def get_policy(self):
+    #     f = os.path.join(self.input_dir, 'irl_policies', f'{self._ctrl[2]}.h5')
+    #     with h5py.File(f, 'r') as hf:
+    #         policy = hf['policy'][:]
+    #     return policy
 
     def set_agent(self):
         p0 = self.smoke_env["init_pose"]
@@ -56,10 +56,8 @@ class Simulator(object):
                   for i in range(len(eps))]
             # e = np.random.normal(0., 10.)
         init_pose = tuple(p0)
-        return {
-            'silkmoth': silkmoth.SilkMoth(*init_pose),
-            'robot': None
-        }.get(self._agt, None)
+        return silkmoth.SilkMoth(*init_pose)
+
 
     def set_env(self, plume):
         cfg = self.smoke_env['env']
@@ -78,8 +76,7 @@ class Simulator(object):
     def set_controller(self):
         return{
             'KPB': programmed_behavior.KPB(self.fps),
-            'IRL': silkmoth_irl.SilkmothIRL(
-                self.fps, self.bin_edges, self.irl_num_states, self.policy)
+            'IRL': silkmoth_irl.SilkmothIRL(self.fps, self.bin_edges, self.irl_num_states, self.policy)
         }.get(self._ctrl[0], None)
 
     def set_animation(self, env):
@@ -98,6 +95,13 @@ class Simulator(object):
                        color='yellow',
                        fill=False,
                        linestyle='--'))
+        ax.add_artist(
+            plt.Rectangle(obstacle["rectangle"]["origin"], 
+                        obstacle["rectangle"]["width"], 
+                        obstacle["rectangle"]["length"],
+                        color='red',
+                        fill=False))
+        
         line, = ax.plot([], lw=1, c='w')
         fig.canvas.draw()
         plt.show(block=False)
@@ -109,29 +113,43 @@ class Simulator(object):
         og = not ((min(xs) + m < p.x < max(xs) - m) and
                 (min(ys) + m < p.y < max(ys) - m))
         return og
+    
 
-    def reached_goal(self, p: Point):
+    def check_is_collsiom(self, p: Point, m):
+        origin_x, origin_y = obstacle["rectangle"]["origin"]
+        limited_xs = [origin_x, origin_x + obstacle["rectangle"]["width"]]
+        limited_ys = [origin_y, origin_y + obstacle["rectangle"]["length"]]
+        return (min(limited_xs) - m < p.x < max(limited_xs)+ m) and (min(limited_ys)- m  < p.y < max(limited_ys)+ m)
+    
+
+    def reached_goal(self, pos):
+        """ 
+        Check if the simulated agent reach the goal
+        """
         radius = self.smoke_env['env']['goalr']
-        return (np.sqrt(p.x**2 + p.y**2) < radius)
+        return (np.sqrt(pos.x**2 + pos.y**2) < radius)
 
-    def plot_trajectory(self, traj, f):
+    # def plot_trajectory(self, traj, f):
 
-        xsrc, ysrc = tuple(self.smoke_env['env']['srcpos'])
-        radius = self.smoke_env['env']['goalr']
+    #     xsrc, ysrc = tuple(self.smoke_env['env']['srcpos'])
+    #     radius = self.smoke_env['env']['goalr']
 
-        fig, ax = plt.subplots()
-        ax.add_artist(Circle((xsrc, ysrc), radius, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
-        ax.scatter(traj.iloc[0,0], traj.iloc[0,1], marker='.')
-        ax.plot(traj.iloc[:,0], traj.iloc[:,1], zorder=3)
-        ax.scatter(xsrc, ysrc, marker='*', c='k')
+    #     fig, ax = plt.subplots()
+    #     ax.add_artist(Circle((xsrc, ysrc), radius, color='r', fill=False, linestyle='--', linewidth=0.5, zorder=1))
+    #     ax.scatter(traj.iloc[0,0], traj.iloc[0,1], marker='.')
+    #     ax.plot(traj.iloc[:,0], traj.iloc[:,1], zorder=3)
+    #     ax.scatter(xsrc, ysrc, marker='*', c='k')
 
-        ax.set_xlim(self.smoke_env['env']['xspace'])
-        ax.set_ylim(self.smoke_env['env']['yspace'])
-        ax.set_aspect('equal')
-        plt.savefig(f, dpi=300)
+    #     ax.set_xlim(self.smoke_env['env']['xspace'])
+    #     ax.set_ylim(self.smoke_env['env']['yspace'])
+    #     ax.set_aspect('equal')
+    #     plt.savefig(f, dpi=300)
 
 
     def run(self, plume, draw_animation=False, save_log=False):
+        """
+        The core of the simulations.
+        """
         agent = self.set_agent()
         env = self.set_env(plume)
         controller = self.set_controller()
@@ -179,7 +197,11 @@ class Simulator(object):
             if antennae_hit > 0: last_hit = antennae_hit
 
             controller.control(antennae_hit, last_hit, dt)
-            agent.move(controller.linear_vel, controller.angular_vel, dt)
+            
+            if self.check_is_collsiom(agent.pos, agent.antenna_length):
+                agent.move(0.0, controller.angular_vel, dt)
+            else:
+                agent.move(controller.linear_vel, controller.angular_vel, dt)
 
             controller._tblank += dt
             x_ls.append(agent.pos.x)

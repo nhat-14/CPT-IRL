@@ -9,6 +9,7 @@ __license__     = "MIT"
 __maintainer__  = "Duc-Nhat Luong"
 __email__       = "nhat.luongduc@gmail.com"
 
+
 from os.path import join, basename, splitext
 import glob
 import random
@@ -16,11 +17,11 @@ import pandas as pd
 from tqdm import tqdm
 import simulator
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Rectangle
 from datetime import datetime
 from pathlib import Path
-
 import config as cfg
+
 
 def tstamp():
     """
@@ -72,8 +73,9 @@ if __name__ == "__main__":
     ax.add_artist(Circle((0,0), 50, color='r', 
                          fill=False, linestyle='--', 
                          linewidth=0.5, zorder=1))
-
+    # ax.add_patch(Rectangle((1, 1), 20, 60))
     plumes = get_list_of_plumes()
+    
     for i in tqdm(range(cfg.Nruns)):
         plume = random.choice(plumes)
         experiment_id = f'{i}_{basename(splitext(plume)[0])}'
@@ -88,5 +90,5 @@ if __name__ == "__main__":
     ax.set_xlim(0,600)
     ax.set_ylim(-360,360)
     ax.set_aspect('equal')
-    plt.show()
     print_simulation_result(sim.performance)
+    plt.show()

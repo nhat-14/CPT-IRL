@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 Parses an inferred policy obtained from rewards extracted by MaxEnt IRL
 """
 import numpy as np
 from collections import namedtuple
 
-LinearVel = namedtuple('LinearVel',
-["stop", "surge", "turn_ccw", "turn_cw"])
-AngularVel = namedtuple('AngularVel',
-["stop", "surge", "turn_ccw", "turn_cw"])
+LinearVel = namedtuple('LinearVel', ["stop", "surge", "turn_ccw", "turn_cw"])
+AngularVel = namedtuple('AngularVel', ["stop", "surge", "turn_ccw", "turn_cw"])
 
 class SilkmothIRL:
     def __init__(self, fps, bin_edges, num_states, policy):
-
         self._tblank = 0.0
         self._hits_sum = 0
         self.linear_vel = 0.0
@@ -23,10 +19,6 @@ class SilkmothIRL:
         self.bin_edges = bin_edges
         self.num_states = num_states
         self.policy = policy
-
-    def __str__(self):
-        return 'tb:{:.3f}, H:{}, s:{}, a:{}'.format(
-            self._tblank, self._hits_sum, self._digi_tblank, self.action)
 
     @property
     def log_header(self):

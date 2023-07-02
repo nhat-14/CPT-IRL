@@ -3,7 +3,6 @@ Silkmoth programmed behavior as defined by Kanzaki et al. (1992)
 """
 from collections import namedtuple
 import numpy as np
-import random
 import pandas as pd
 
 Delay = namedtuple('Delay', ['surge', 'turn1', 'turn2', 'turn3'])
@@ -60,7 +59,7 @@ class KPB(object):
 
     
     def control(self, ant_state, last_hit, dt):
-        # IRL
+        # # IRL
         action_set = [[0,0],[19,0.062],[0.8,1.3],[0.8,-1.3]]
         
         if ant_state == 0:
@@ -72,46 +71,45 @@ class KPB(object):
         elif ant_state == 3:
             a = 3
 
-        bins = pd.read_csv('bombyxsim-template/bin_edges/bin_edges.csv').values
+        bins = pd.read_csv('setup_data/bin_edges.csv').values
         bins = np.delete(bins, 0, 0)
         bins = np.delete(bins, -1, 0).T
         bins = bins[0].tolist()
         b = np.digitize(self._tblank, bins)
 
-        policy = np.loadtxt('bombyxsim-template/irl_policies/simple_policy.csv', delimiter = ',')
+        policy = np.loadtxt('setup_data/simple_policy.csv', delimiter = ',')
         action = int(policy[a,b])
         
         [self.linear_vel, self.angular_vel] = action_set[action]
         
         state = self.state(ant_state)
         
-        #KPB
-        """
-        state = self.state(ant_state)
-        lin_v = LinearVel(0.0, 26.0, 0.0)
-        ang_v = AngularVel(0.0, 0.087, 1.0, -1.0) #radians per second
-        u = {
-            'stop': lambda last_hit: (lin_v.stop, ang_v.stop),
-            'surge': lambda last_hit: (
-                lin_v.surge, 
-                ang_v.surge*-1 if last_hit == 0b01 else ang_v.surge),
-            'turn1': lambda last_hit: (
-                lin_v.turn, 
-                ang_v.turncw if last_hit == 0b10 else ang_v.turnccw
-            ),
-            'turn2': lambda last_hit: (
-                lin_v.turn,
-                ang_v.turncw if last_hit == 0b01 else ang_v.turnccw
-            ),
-            'turn3': lambda last_hit: (
-                lin_v.turn,
-                ang_v.turncw if last_hit == 0b10 else ang_v.turnccw
-            ),
-            'loop': lambda last_hit: (
-                lin_v.turn,
-                ang_v.turncw if last_hit == 0b01 else ang_v.turnccw
-            )
-        }
+        # ## KPB
+        
+        # state = self.state(ant_state)
+        # lin_v = LinearVel(0.0, 26.0, 0.0)
+        # ang_v = AngularVel(0.0, 0.087, 1.0, -1.0) #radians per second
+        # u = {
+        #     'stop': lambda last_hit: (lin_v.stop, ang_v.stop),
+        #     'surge': lambda last_hit: (
+        #         lin_v.surge, 
+        #         ang_v.surge*-1 if last_hit == 0b01 else ang_v.surge),
+        #     'turn1': lambda last_hit: (
+        #         lin_v.turn, 
+        #         ang_v.turncw if last_hit == 0b10 else ang_v.turnccw
+        #     ),
+        #     'turn2': lambda last_hit: (
+        #         lin_v.turn,
+        #         ang_v.turncw if last_hit == 0b01 else ang_v.turnccw
+        #     ),
+        #     'turn3': lambda last_hit: (
+        #         lin_v.turn,
+        #         ang_v.turncw if last_hit == 0b10 else ang_v.turnccw
+        #     ),
+        #     'loop': lambda last_hit: (
+        #         lin_v.turn,
+        #         ang_v.turncw if last_hit == 0b01 else ang_v.turnccw
+        #     )
+        # }
 
-        self.linear_vel, self.angular_vel = u[state](last_hit)
-        """
+        # self.linear_vel, self.angular_vel = u[state](last_hit)
