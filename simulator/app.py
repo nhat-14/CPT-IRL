@@ -19,6 +19,7 @@ import simulator
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 from datetime import datetime
+from  multiprocessing.pool import ThreadPool
 from pathlib import Path
 import config as cfg
 
@@ -61,6 +62,18 @@ def get_list_of_plumes():
     return [i for i in glob.glob(name_format)]
 
 
+def test(i):
+    print(f"Simulation trial {i}")
+    plume = random.choice(plumes)
+    experiment_id = f'{i}_{basename(splitext(plume)[0])}'
+    trajectory, log = sim.run(plume, draw_animation=cfg.animation, save_log=cfg.save_log)
+    output_dir = make_dir(cfg.input_dir)
+    log.to_csv(join(output_dir, f'{experiment_id}_log.csv'), index=False)
+
+    # sim.plot_trajectory(trajectory, join(tmp_dir, experiment_id))
+    ax.plot(trajectory.iloc[:,0], trajectory.iloc[:,1], linewidth=0.5, c='g')
+
+
 if __name__ == "__main__":
     sim = simulator.Simulator(cfg.input_dir,
                               cfg.smoke_environment,
@@ -75,16 +88,21 @@ if __name__ == "__main__":
                          linewidth=0.5, zorder=1))
     # ax.add_patch(Rectangle((1, 1), 20, 60))
     plumes = get_list_of_plumes()
-    
-    for i in tqdm(range(cfg.Nruns)):
-        plume = random.choice(plumes)
-        experiment_id = f'{i}_{basename(splitext(plume)[0])}'
-        trajectory, log = sim.run(plume, draw_animation=cfg.animation, save_log=cfg.save_log)
-        output_dir = make_dir(cfg.input_dir)
-        log.to_csv(join(output_dir, f'{experiment_id}_log.csv'), index=False)
 
-        # sim.plot_trajectory(trajectory, join(tmp_dir, experiment_id))
-        ax.plot(trajectory.iloc[:,0], trajectory.iloc[:,1], linewidth=0.5, c='g')
+    with tqdm(total=cfg.Nruns) as pbar: 
+        with ThreadPool() as pool:
+            for result in pool.map(test, range(cfg.Nruns)):
+                pbar.update(1)
+
+    # for i in tqdm(range(cfg.Nruns)):
+    #     plume = random.choice(plumes)
+    #     experiment_id = f'{i}_{basename(splitext(plume)[0])}'
+    #     trajectory, log = sim.run(plume, draw_animation=cfg.animation, save_log=cfg.save_log)
+    #     output_dir = make_dir(cfg.input_dir)
+    #     log.to_csv(join(output_dir, f'{experiment_id}_log.csv'), index=False)
+
+    #     # sim.plot_trajectory(trajectory, join(tmp_dir, experiment_id))
+    #     ax.plot(trajectory.iloc[:,0], trajectory.iloc[:,1], linewidth=0.5, c='g')
 
     ax.scatter(0, 0, marker='*', c='k')
     ax.set_xlim(0,600)
@@ -92,3 +110,5 @@ if __name__ == "__main__":
     ax.set_aspect('equal')
     print_simulation_result(sim.performance)
     plt.show()
+
+

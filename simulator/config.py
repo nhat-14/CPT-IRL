@@ -3,7 +3,7 @@ tlim = 170
 env = "smokevid"        #Type of environment
 agt = "silkmoth"        #Type of agent
 controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
-Nruns = 20              #Number of simulation runs
+Nruns = 50              #Number of simulation runs
 animation = False       #Draw animation
 input_dir = "setup_data" # Path of the directory with odor plume data
 save_log = True
@@ -22,7 +22,7 @@ smoke_environment = {
     "irl":{
         "num_states": ["tblank", "hits"]
     },
-    "init_pose": [300.0, 150.0, 180.0],
+    "init_pose": [300.0, 0.0, 180.0],
     "random_start": True,
     "init_pose_eps": [
         10.0,

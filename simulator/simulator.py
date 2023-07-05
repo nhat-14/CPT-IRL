@@ -2,9 +2,6 @@
 Setup an environment, agent and controller for an olfactory search simulation
 """
 
-import os
-import json
-import h5py
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -12,7 +9,7 @@ import numpy as np
 from utils.geometry import Point
 import silkmoth
 from controllers import silkmoth_irl, programmed_behavior
-from envs import smoke_video, wind_tunnel
+from envs import smoke_video
 from config import obstacle
 
 class Simulator(object):
@@ -61,22 +58,15 @@ class Simulator(object):
 
     def set_env(self, plume):
         cfg = self.smoke_env['env']
+        return smoke_video.SmokeVideo(plume, self.Nsteps, cfg['width'],
+                cfg['height'], tuple(cfg['srcpos']),
+                tuple(cfg['xspace']), tuple(cfg['yspace']))
 
-        return {
-            'smokevid':
-            smoke_video.SmokeVideo(plume, self.Nsteps, cfg['width'],
-                                   cfg['height'], tuple(cfg['srcpos']),
-                                   tuple(cfg['xspace']), tuple(cfg['yspace'])),
-            'windtunnel':
-            wind_tunnel.WindTunnel(plume, self.Nsteps, cfg['width'],
-                                   cfg['height'], tuple(cfg['srcpos']),
-                                   tuple(cfg['xspace']), tuple(cfg['yspace']))
-        }.get(self._env, None)
 
     def set_controller(self):
         return{
             'KPB': programmed_behavior.KPB(self.fps),
-            'IRL': silkmoth_irl.SilkmothIRL(self.fps, self.bin_edges, self.irl_num_states, self.policy)
+            # 'IRL': silkmoth_irl.SilkmothIRL(self.fps, self.bin_edges, self.irl_num_states, self.policy)
         }.get(self._ctrl[0], None)
 
     def set_animation(self, env):
@@ -115,7 +105,7 @@ class Simulator(object):
         return og
     
 
-    def check_is_collsiom(self, p: Point, m):
+    def check_is_collsion(self, p: Point, m):
         origin_x, origin_y = obstacle["rectangle"]["origin"]
         limited_xs = [origin_x, origin_x + obstacle["rectangle"]["width"]]
         limited_ys = [origin_y, origin_y + obstacle["rectangle"]["length"]]
@@ -184,11 +174,9 @@ class Simulator(object):
             if np.cos(np.pi - agent.theta + self.wind_angle) > 0:
                 right_hit = env.hit_at(t, env.mm2px(agent.right_antenna))
                 left_hit = env.hit_at(t, env.mm2px(agent.left_antenna))
-
                 if hit_noise:
                     right_hit *= hit_eps
                     left_hit *= hit_eps
-
             else:
                 right_hit = 0
                 left_hit = 0
@@ -198,10 +186,10 @@ class Simulator(object):
 
             controller.control(antennae_hit, last_hit, dt)
             
-            if self.check_is_collsiom(agent.pos, agent.antenna_length):
-                agent.move(0.0, controller.angular_vel, dt)
-            else:
-                agent.move(controller.linear_vel, controller.angular_vel, dt)
+            # if self.check_is_collsion(agent.pos, agent.antenna_length):
+            #     agent.move(0.0, controller.angular_vel, dt)
+            # else:
+            agent.move(controller.linear_vel, controller.angular_vel, dt)
 
             controller._tblank += dt
             x_ls.append(agent.pos.x)
