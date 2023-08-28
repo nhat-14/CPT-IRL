@@ -7,19 +7,70 @@ import pandas as pd
 from tqdm import tqdm
 from sklearn.preprocessing import KBinsDiscretizer
 
-import config
+import config as cfg
+
+
+def get_csv_files():
+    """
+    Get csv files of trajectories obtained from Moth VR experiments
+    in input folder specified in the config.py
+    """
+    input_dir = cfg.INPUT_DIR
+    return list(glob.glob(join(input_dir, '*.csv')))
+
+
+def get_df_from_csv(file_name):
+    """
+    Return a full formated panda data frame from csv
+    """
+    data = pd.read_csv(file_name)   # Read csv into a dataframe
+    data.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
+    return data
+
+
+def check_is_timeout(last_time):
+    """
+    Check if an experiment has the run time larger than time limit
+    """
+    return last_time > cfg.exp_timeout
+
+
+def check_is_source_found(last_x, last_y):
+    """
+    Check if the agent reach the source or not
+    The source positon is set at coordinate (0,0) 
+    """
+    return np.sqrt(last_x**2 + last_y**2) <= cfg.GOAL_RADII
+
+
+def cal_velocities(data):
+    get_linear_vel(data)
+    get_angular_vel(data)
+    moving_averaged_velocity(data, cfg.WINDOW_SIZE)
+
 
 def get_linear_vel(data):
     """Get linear velocity based on x, y position vectors
     change during the time step
     """
-    dt = get_time_step(data)
     x = data['x_mm'].to_numpy()
     y = data['y_mm'].to_numpy()
     dR = np.hypot((x[1:] - x[:-1]), (y[1:] - y[:-1]))
     # insert 0 at 0 index to have the same length with
     dR = np.insert(dR, 0, 0)
-    data['linear_vel'] = dR/dt
+    data['linear_vel'] = dR/cfg.time_step
+
+
+def get_angular_vel(data):
+    """Get angular velocity based on vector of heading angles (rad)
+    change during time step duration
+    """
+    theta = data['theta_rad'].to_numpy()
+    delta_theta = (theta[1:] - theta[:-1])
+    wrapping_angle_from_0to2pi(delta_theta)
+    # insert 0 at 0 index to have the same length with
+    delta_theta = np.insert(delta_theta, 0, 0)
+    data['angular_vel'] = delta_theta / cfg.time_step
 
 
 def wrapping_angle_from_0to2pi(angle):
@@ -29,27 +80,15 @@ def wrapping_angle_from_0to2pi(angle):
     angle[mask] = angle[mask] + 2*np.pi
 
 
-def get_angular_vel(data):
-    """Get angular velocity based on vector of heading angles (rad)
-    change during time step duration
-    """
-    dt = data.at[1, 'Time'] - data.at[0, 'Time']
-    theta = data['theta_rad'].to_numpy()
-    delta_theta = (theta[1:] - theta[:-1])
-    wrapping_angle_from_0to2pi(delta_theta)
-    # insert 0 at 0 index to have the same length with
-    delta_theta = np.insert(delta_theta, 0, 0)
-    data['angular_vel'] = delta_theta / dt
-
-
-def centerline_deviation(y, dt, y_src=0.):
+def cal_centerline_deviation(data):
     """
     Calculate the deviation of the moth movement along center line (y=0)
     """
-    y = y.to_numpy()
-    dy = (y - y_src) * dt
+    y_src = 0.0
+    y = data['y_mm'].to_numpy()
+    dy = (y - y_src) * cfg.time_step
     c = np.cumsum(dy)
-    return pd.Series(c)
+    data['cdv'] = pd.Series(c)
 
 
 def resample_data(df, dt, tl):
@@ -69,58 +108,23 @@ def resample_data(df, dt, tl):
     return rescaled_df
 
 
-def get_csv_files():
-    """
-    Get csv files of trajectories obtained from Moth VR experiments
-    in input folder specified in the config.py
-    """
-    input_dir = config.INPUT_DIR
-    return list(glob.glob(join(input_dir, '*.csv')))
-
-
-def check_is_source_found(data):
-    """
-    Check if the agent reach the source or not
-    The source positon is set at coordinate (0,0) 
-    """
-    last_x = data['x_mm'].iloc[-1]
-    last_y = data['y_mm'].iloc[-1]
-    return np.sqrt(last_x**2 + last_y**2) <= config.GOAL_RADII
-
-
-def cal_tortuosity(x_pos_log, y_pos_log, route_len):
+def cal_tortuosity(data):
     """
     Calculate tortuosity: the ratio between the traveled distance
     over the moving distance as the crow flies of agent in one trial 
     """
-    first_x = x_pos_log.iloc[0]
-    first_y = y_pos_log.iloc[0]
-    last_x = x_pos_log.iloc[-1]
-    last_y = y_pos_log.iloc[-1]
+    first_x = data['x_mm'].iloc[0]
+    first_y = data['y_mm'].iloc[0]
+    last_x = data['x_mm'].iloc[-1]
+    last_y = data['y_mm'].iloc[-1]
     crow_flies_dist = np.hypot(last_x - first_x, last_y - first_y)
-    return route_len/crow_flies_dist
+    data['tortuosity'] = data['traveled_distance']/crow_flies_dist
 
 
 def count_hits(whiff):
     whiff = whiff.to_numpy()
     count = (whiff[:-1] < whiff[1:]).cumsum()
     return np.insert(count, 0, 0).astype('int')
-
-
-def get_data_frame_from_csv(file_name):
-    """
-    Return a full formated panda data frame from csv
-    """
-    data = pd.read_csv(file_name)   # Read csv into a dataframe
-    data.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
-    return data
-
-
-def check_is_timeout(data, time_limit):
-    """
-    Check if an experiment has the run time larger than time limit
-    """
-    return data['Time'].iloc[-1] > time_limit
 
 
 def moving_averaged_velocity(data, window_size):
@@ -137,7 +141,7 @@ def fill_future_states(data):
         data[f'{state}_k'] = data.loc[:, state].shift(-1, fill_value=0)
 
 
-def set_last_hit(data):
+def cal_last_hit(data):
     """
     Get last hit type (Both, Left, Right)
     """
@@ -164,12 +168,6 @@ def discretize(dataframe, kbins, strat_kmeans=False):
     return km_transformed, km_edges
 
 
-def extract_velocity_from_pose(data):
-    get_linear_vel(data)
-    get_angular_vel(data)
-    moving_averaged_velocity(data, config.WINDOW_SIZE)
-
-
 def numerize_antennae(data):
     antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
     data['antennae'] = data['antennae'].map(antennae_dict)
@@ -180,13 +178,8 @@ def numerize_wind(data):
     data['wind'] = data['wind'].map(wind_dict)
 
 
-def get_time_step(data):
-    dt = data['Time'].iloc[1] - data['Time'].iloc[0]
-    return dt
-
-
 def cal_whiff_duration(data):
-    dt = get_time_step(data)
+    dt = cfg.time_step
     data['twhiff'] = data.groupby(data.antennae.eq(0).cumsum()).cumcount(ascending=True)
     data['twhiff'] = data['twhiff'].mul(dt)
     data['twhiff'] = data.loc[:, 'twhiff'].shift(1, fill_value=0)
@@ -197,9 +190,9 @@ def cal_whiff_duration(data):
     data['log_twhiff'] = log_twhiff
 
 
-def set_time_blank(data):
+def cal_time_blank(data):
     # Calculate blank duration. no hit during tblank => no change in hit_cum
-    dt = get_time_step(data)
+    dt = cfg.time_step
     hit_cum = data.antennae.gt(0).cumsum()
     data['tblank'] = data.groupby(hit_cum).cumcount(ascending=True)
     data['tblank'] = data['tblank'].mul(dt)
@@ -209,7 +202,7 @@ def set_time_blank(data):
     data['log_tblank'] = np.log1p(data['tblank'].to_numpy())
 
 
-def extract_hit_related_features(data):
+def cal_hit_related_features(data):
     # whiff: binary value of odor detection
     data['whiff'] = (data.antennae.to_numpy() > 0).astype('uint8')
 
@@ -217,50 +210,64 @@ def extract_hit_related_features(data):
     data['hits_count'] = count_hits(data['whiff'])
     
     # get number of hits per 1 second
-    dt = get_time_step(data)
+    dt = cfg.time_step
     data.loc[:, 'hit_rate'] = data['whiff'].rolling(int(1 / dt), min_periods=1).sum()
 
 
-def merge_data(timeout=0):
+def cal_regions(data):
     """
-    Calculate linear and angular velocity from trajectories and timestamp
+    Determine the region of agent staying in obstacle region
+    For rectangle obstacle => 2 regions (1 and 0)
     """
-    dataframe_list = [] # List of data of each trials
+    devide_line_x = cfg.lower_corner[0] + cfg.width/2
+    data['region'] = (data.x_mm.to_numpy() > devide_line_x).astype('uint8')
+
+
+
+def merge_data():
+    """
+    Raw data processing to useful data such as features for ML
+    """
+    df_list = [] # List of dataframe of each trials
     n_success_runs = 0
 
     csv_list = get_csv_files()
+
     for csvfile in tqdm(csv_list, ncols=0, desc='Merging csv files'):
-        # only use the trial which data is recorded within the timeout
-        df = get_data_frame_from_csv(csvfile)
-        if check_is_timeout(df, timeout):
+        # only use the trial with runtime within timeout
+        df = get_df_from_csv(csvfile)
+
+        # skip a moth search if runtime larger than timeout
+        if check_is_timeout(df['Time'].iloc[-1]): 
             continue
         
-        if check_is_source_found(df):
+        if check_is_source_found(df['x_mm'].iloc[-1], df['y_mm'].iloc[-1]): 
             n_success_runs += 1
 
-        # Define time step duration (0.0333s)
-        time_step = df['Time'].iloc[1]
-        extract_velocity_from_pose(df)
-        
-        # Calculate some characteristic of trajectory paterns
-        df['traveled_distance'] = (df['linear_vel']*time_step).cumsum()
-        df['tortuosity'] = cal_tortuosity(df['x_mm'], df['y_mm'], df['traveled_distance'])
-        df['cdv'] = centerline_deviation(df['y_mm'], time_step)
+        # ===== free-environment features extractation ====
+        cal_velocities(df)
+        df['traveled_distance'] = (df['linear_vel'] * cfg.time_step).cumsum()
+        cal_tortuosity(df)
+        cal_centerline_deviation(df)
         df['heading'] = np.cos(np.pi - df['theta_rad'].to_numpy())
-
         numerize_antennae(df)
         numerize_wind(df)
-        extract_hit_related_features(df)
-        set_last_hit(df)
-        set_time_blank(df)
+        cal_hit_related_features(df)
+        cal_last_hit(df)
+        cal_time_blank(df)
         cal_whiff_duration(df)
         fill_future_states(df)
-        
+
+        # ===== obstacle regions features extractation ====
+        cal_regions(df)
+
+
+
         # Add column with experiment name as the csv file name
         df['experiment'] = os.path.basename(csvfile)
-        dataframe_list.append(df)
+        df_list.append(df)
 
-    dataframe_list = pd.concat(dataframe_list, ignore_index=True)
+    df_list = pd.concat(df_list, ignore_index=True)
 
     print(f'Successful runs: {n_success_runs}/{len(csv_list)}')
-    return dataframe_list
+    return df_list

@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import preprocessing
 import markov_decission_process as mdp
-import config
+import config as cfg
 
 
 def get_timestamp():
@@ -47,8 +47,8 @@ def get_expert_demos(df):
     Encoding the states and actions into discrete space
     """
     # name, bins, skewed, use logscale, use_kmeans
-    numeric_states = config.numeric_states
-    categoric_states = config.categoric_states
+    numeric_states = cfg.numeric_states
+    categoric_states = cfg.categoric_states
     mdp_space = mdp.MothMDP(df, numeric_states, categoric_states)
     mdp_space.encode_states()
     mdp_space.encode_actions()
@@ -78,12 +78,10 @@ def export_csv(data, file_name, destination_folder):
 
 
 if __name__ == "__main__":
-    dfs = preprocessing.merge_data(timeout=260)
-    mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())    
+    # Processing raw data to features
+    dfs = preprocessing.merge_data()
 
-    pd.set_option('display.max_rows', len(mdp_demos))
-    print(mdp_demos['action'].value_counts())
-    pd.reset_option('display.max_rows')
+    mdp_demos, mdp_edges, transition_prob = get_expert_demos(dfs.copy())    
 
     out_dir = create_output_folder()
     np.save((join(out_dir, 'trans_prob.npy')), transition_prob)
