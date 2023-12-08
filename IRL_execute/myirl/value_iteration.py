@@ -6,8 +6,8 @@ matthew.alger@anu.edu.au
 """
 
 import numpy as np
-import numba
-from numba import jit
+# import numba
+# from numba import jit
 
 def value(policy, n_states, transition_probabilities, reward, discount,
                     threshold=1e-2):

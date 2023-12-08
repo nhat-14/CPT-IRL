@@ -58,5 +58,6 @@ IRL_execute/data/*.csv
 .simulator/bombyxsim-template/silkmoth_smokevid_KPB*
 simulator/bombyxsim-template/silkmoth_smokevid*
 *.csv
-
+*.png
+*.npy
 /videoToH5/*.mp4

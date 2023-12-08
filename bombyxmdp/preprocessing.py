@@ -1,45 +1,37 @@
 import os
-import glob
-from os.path import join
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from sklearn.preprocessing import KBinsDiscretizer
-
 import config as cfg
+import utilities as util   
 
 
-def get_csv_files():
-    """
-    Get csv files of trajectories obtained from Moth VR experiments
-    in input folder specified in the config.py
-    """
-    input_dir = cfg.INPUT_DIR
-    return list(glob.glob(join(input_dir, '*.csv')))
-
-
-def get_df_from_csv(file_name):
+def get_df_from_csv(file_name) -> pd.DataFrame:
     """
     Return a full formated panda data frame from csv
     """
-    data = pd.read_csv(file_name)   # Read csv into a dataframe
+    data = pd.read_csv(file_name) 
     data.columns = ['Time', 'x_mm', 'y_mm', 'theta_rad', 'antennae', 'wind']
+    data['experiment'] = os.path.basename(file_name)
     return data
 
 
-def check_is_timeout(last_time):
+def is_timeout(data) -> bool:
     """
     Check if an experiment has the run time larger than time limit
     """
+    last_time = data['Time'].iloc[-1]
     return last_time > cfg.exp_timeout
 
 
-def check_is_source_found(last_x, last_y):
+def is_source_found(data) -> bool:
     """
     Check if the agent reach the source or not
     The source positon is set at coordinate (0,0) 
     """
+    last_x = data['x_mm'].iloc[-1]
+    last_y = data['y_mm'].iloc[-1]
     return np.sqrt(last_x**2 + last_y**2) <= cfg.GOAL_RADII
 
 
@@ -47,6 +39,14 @@ def cal_velocities(data):
     get_linear_vel(data)
     get_angular_vel(data)
     moving_averaged_velocity(data, cfg.WINDOW_SIZE)
+
+
+def cal_travelled_distance(data):
+    data['traveled_distance'] = (data['linear_vel'] * cfg.time_step).cumsum()
+
+
+def cal_moth_heading(data):
+    data['heading'] = np.cos(np.pi - data['theta_rad'].to_numpy())
 
 
 def get_linear_vel(data):
@@ -137,7 +137,7 @@ def fill_future_states(data):
     """
     Shift one time step to show what is the next state given current state
     """
-    for state in ["tblank", "log_tblank", "antennae", "hits_count", "wind"]:
+    for state in ["tblank", "log_tblank", "antennae", "hits_count", "wind", "region_x"]:
         data[f'{state}_k'] = data.loc[:, state].shift(-1, fill_value=0)
 
 
@@ -147,10 +147,9 @@ def cal_last_hit(data):
     """
     # if agent got hit, last is the current hit
     data.loc[:, 'lasthit'] = data[data.antennae > 0].antennae
-    # ffill: propagate last hit forward when no recent hits
-    data['lasthit'].fillna(method='ffill', inplace=True)
     data['lasthit'] = data.loc[:, 'lasthit'].shift(1, fill_value=0)
-    data['lasthit'].fillna(0, inplace=True)
+    # ffill: propagate last hit forward when no recent hits
+    data['lasthit'] = data['lasthit'].ffill()
     data['lasthit'] = data.lasthit.astype('uint8')
 
 
@@ -219,55 +218,81 @@ def cal_regions(data):
     Determine the region of agent staying in obstacle region
     For rectangle obstacle => 2 regions (1 and 0)
     """
-    devide_line_x = cfg.lower_corner[0] + cfg.width/2
-    data['region'] = (data.x_mm.to_numpy() > devide_line_x).astype('uint8')
+    devide_line_x = cfg.lower_corner[0] + cfg.width/2 
+    upper_line_y = cfg.lower_corner[1] + cfg.length
+    lower_line_y = cfg.lower_corner[1]
+    data['region_x'] = 0
+    data['region_y'] = 0
+    data.loc[data['x_mm'] > devide_line_x, 'region_x'] = 1
+    data.loc[data['y_mm'] > upper_line_y, 'region_y'] = 1
+    data.loc[data['y_mm'] < lower_line_y, 'region_y'] = 2
 
 
-
-def merge_data():
+def cal_heading_to_obstacle(data):
     """
-    Raw data processing to useful data such as features for ML
+    Determine the direction of heading of agent toward
+    or outward the obstacle.
     """
-    df_list = [] # List of dataframe of each trials
-    n_success_runs = 0
+    devide_line_x = cfg.lower_corner[0] + cfg.width/2 
+    data.loc[data['x_mm'] > devide_line_x, 'region_x'] = 1
+    data['heading_obs'] = 0
+    data.loc[(data['x_mm'] > devide_line_x) & (data['heading'] > 0), 'heading_obs'] = 1
+    data.loc[(data['x_mm'] < devide_line_x) & (data['heading'] < 0), 'heading_obs'] = 1
 
-    csv_list = get_csv_files()
 
-    for csvfile in tqdm(csv_list, ncols=0, desc='Merging csv files'):
-        # only use the trial with runtime within timeout
+def cal_dist2obstcle(data):
+    """
+    Calculacte the distance of the agent and the obstacle at anytime.
+    For asymmetric obstacle (in both x and y), obstacle is devidend into
+    multiple components with its own center. 
+    """
+    data['obstacle_distance'] = np.inf
+    # devide the obstacle into 10 parts
+    for i in range(9): 
+        x_obs = cfg.lower_corner[0] + cfg.width/2  
+        y_obs = cfg.lower_corner[1] + (i+0.5)*(cfg.length/10)
+        x_dist = data.x_mm.to_numpy() - x_obs
+        y_dist = data.y_mm.to_numpy() - y_obs
+        dist = np.sqrt(np.power(x_dist, 2) + np.power(y_dist, 2))
+        lastest_dist = data['obstacle_distance'].to_numpy()
+        data['obstacle_distance'] = np.minimum(dist, lastest_dist)
+
+
+def extract_features(data):
+    # ===== free-environment features extractation ====
+    cal_velocities(data)
+    cal_travelled_distance(data)
+    cal_tortuosity(data)
+    cal_centerline_deviation(data)
+    cal_moth_heading(data)
+    numerize_antennae(data)
+    numerize_wind(data)
+    cal_hit_related_features(data)
+    cal_last_hit(data)
+    cal_time_blank(data)
+    cal_whiff_duration(data)
+    
+    # ===== obstacle regions features extractation ====
+    cal_regions(data)
+    cal_dist2obstcle(data)
+    cal_heading_to_obstacle(data)
+    fill_future_states(data)
+
+
+def merge_data() -> pd.DataFrame:
+    """
+    Process raw data to useful data such as features for IRL
+    """
+    merged_df = pd.DataFrame()
+    n_success = 0
+
+    csv_list = util.get_csv_files(cfg.INPUT_DIR, '*.csv')
+    for csvfile in csv_list:
         df = get_df_from_csv(csvfile)
-
-        # skip a moth search if runtime larger than timeout
-        if check_is_timeout(df['Time'].iloc[-1]): 
-            continue
-        
-        if check_is_source_found(df['x_mm'].iloc[-1], df['y_mm'].iloc[-1]): 
-            n_success_runs += 1
-
-        # ===== free-environment features extractation ====
-        cal_velocities(df)
-        df['traveled_distance'] = (df['linear_vel'] * cfg.time_step).cumsum()
-        cal_tortuosity(df)
-        cal_centerline_deviation(df)
-        df['heading'] = np.cos(np.pi - df['theta_rad'].to_numpy())
-        numerize_antennae(df)
-        numerize_wind(df)
-        cal_hit_related_features(df)
-        cal_last_hit(df)
-        cal_time_blank(df)
-        cal_whiff_duration(df)
-        fill_future_states(df)
-
-        # ===== obstacle regions features extractation ====
-        cal_regions(df)
-
-
-
-        # Add column with experiment name as the csv file name
-        df['experiment'] = os.path.basename(csvfile)
-        df_list.append(df)
-
-    df_list = pd.concat(df_list, ignore_index=True)
-
-    print(f'Successful runs: {n_success_runs}/{len(csv_list)}')
-    return df_list
+        # only use the moth search with runtime within timeout 
+        if not is_timeout(df): 
+            n_success += int(is_source_found(df))
+            extract_features(df)
+            merged_df = pd.concat([merged_df, df], ignore_index=True)
+    print(f'Successful runs: {n_success}/{len(csv_list)}')
+    return merged_df
