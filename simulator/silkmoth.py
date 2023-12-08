@@ -8,13 +8,8 @@ class SilkMoth(object):
     def __init__(self, x0, y0, th0):
         self.pos = Point(x0, y0)
         self.theta = np.deg2rad(th0)
-        # IAA: inter antennal angle in degrees
-        self.iaa = np.deg2rad(30)
-        # Antennae length in mm
-        self.antenna_length = 5
-
-    def __str__(self):
-        return 'x:{:.2f}, y:{:.2f}, th:{:.2f}'.format(self.pos.x, self.pos.y, self.theta)
+        self.iaa = np.deg2rad(30)   # Inter antennal angle in degrees
+        self.antenna_length = 5     # mm
 
     @property
     def log_header(self):
@@ -38,8 +33,6 @@ class SilkMoth(object):
 
     def move(self, rdot, omega, dt):
         """Move based on linear and angular velocity commands
-
-        Args:
             rdot (float): Linear velocity
             omega (float): Angular velocity
             dt (float): Time differential in seconds

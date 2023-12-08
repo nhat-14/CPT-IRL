@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import preprocessing as prep
+import bombyxmdp.preprocessing as prep
 import matplotlib.pyplot as plt
 
 def print_full_dataframe(data):
@@ -81,13 +81,12 @@ class MothMDP(object):
             self.digi_edges[state.name] = edges
 
     def merge_categoric_states(self):
-
         s0, s1 = tuple(self.categoric_states)
         sk0, sk1 = tuple([s + '_k' for s in self.categoric_states])
         b0, b1 = (len(self.df[s0].unique()), len(self.df[s0].unique()))
-
         self.df.loc[:, 'state_cat_i'] = self.df[s0] + self.df[s1] * b0
         self.df.loc[:, 'state_cat_k'] = self.df[sk0] + self.df[sk1] * b0
+
 
     def merge_states(self):
         ni, nk = ('state_num_i', 'state_num_k')
@@ -177,11 +176,11 @@ class MothMDP(object):
                 denom = np.sum(tp[i, j])
                 tp[i, j] = tp[i, j] / denom if denom else 0
 
-        M = tp
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        x,y,z = np.meshgrid(range(n_states), range(n_actions), range(n_states))
-        ax.scatter(x,y,z, c=M.flat)
-        plt.show()
+        # M = tp
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # x,y,z = np.meshgrid(range(n_states), range(n_actions), range(n_states))
+        # ax.scatter(x,y,z, c=M.flat)
+        # plt.show()
 
         return tp

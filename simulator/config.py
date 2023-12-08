@@ -1,10 +1,11 @@
-tlim = 250              # Simulation time limit in seconds
+# tlim = 250              # Simulation time limit in seconds
+tlim = 170
 env = "smokevid"        #Type of environment
 agt = "silkmoth"        #Type of agent
 controller = ['KPB']    #Type of controller: [KPB, IRL (specify policy file)]
-Nruns = 1              #Number of simulation runs
+Nruns = 50              #Number of simulation runs
 animation = False       #Draw animation
-input_dir = "bombyxsim-template" # Path of the directory with odor plume data
+input_dir = "setup_data" # Path of the directory with odor plume data
 save_log = True
 plt_traj = True
 
@@ -31,4 +32,12 @@ smoke_environment = {
     "hit_noise": True,
     "hit_probability": 1.0,
     "wind_angle": 0.0
+}
+
+obstacle = {
+    "rectangle" : {
+        "origin":(210, -80),
+        "width": 15,
+        "length": 150
+    }
 }
