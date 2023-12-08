@@ -24,8 +24,8 @@ import utilities as util
 from bombyxmdp import preprocessing
 from IRL_execute import app
 from IRL_execute import neo_mothworld
-from IRL_execute.myirl import value_iteration
-from IRL_execute.myirl import deep_maxent
+from IRL_execute import value_iteration
+from IRL_execute import deep_maxent
 
 ######################### Data Preprocessing #############################
 # 1) Extracting features from raw data
@@ -110,6 +110,5 @@ for i in range(len(moth_policy)):
         os.path.join(out_dir, f'policy_{config.action_labels[i]}.csv'))
 
 print('Reward and policy saved to disk')
-
-app.plot_policy(out_dir)
+# app.plot_policy(out_dir)
 app.plot_reward_function(reward, out_dir)

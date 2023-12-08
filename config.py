@@ -31,11 +31,6 @@ categoric_states    = ['antennae'] # or ['antennae', 'wind']
 # categoric_states    = ['antennae', 'region_x'] # or ['antennae', 'wind']
 
 
-
-
-
-
-
 #================================= IRL Config ================================
 
 # states related configurations
@@ -56,10 +51,9 @@ substate_ticks  = {
                     "wind": ["Left", "Front", "Right", "Back"]
                 }
 
-
 # learning related configurations
 discount        = 0.9       # Discount factor
-epochs          = 100       # Training epochs for the gradient descent
+epochs          = 200       # Training epochs for the gradient descent
 learning_rate   = 0.01
 traj_len        = 1300      # Trajectory length
 NNstructure     = (4, 3)    # Neural network structure tuple
