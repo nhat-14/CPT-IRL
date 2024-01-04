@@ -1,11 +1,15 @@
-This project will systematically lead you through the process of utilizing trajectory data from male silkmoths as they locate female silkmoths, with the ultimate goal of designing an artificial agent for odor source localization.
-
-# Learning data
-Data is obtained by recording the male silkmoths' behaviors in the mothVR system described in this [article](https://elifesciences.org/articles/72001).
+This project will systematically lead you through the process of utilizing trajectory data from male silkmoths as they locate female silkmoths, with the ultimate goal of designing an artificial agent for odor source localization. Data is obtained by recording the male silkmoths' behaviors in the mothVR system described in this [article](https://elifesciences.org/articles/72001).
 
 # Usage 
 ## Data preprocessing and learning
-The main program is in main.py where the raw data is processed firstly before passed for inverse reinforcement learning (IRL). The outcome of the IRL will be te reward function.
+The main program is in main.py where the raw data is processed firstly before passed for inverse reinforcement learning (IRL). The outcome of the IRL will be te reward function. 
+
+To start data preprocessing and use IRL to get reward function, enter the following command: 
+
+```
+python3 main.py
+```
+
 
 # Bombyxsim
 

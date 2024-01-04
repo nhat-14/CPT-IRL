@@ -1,10 +1,3 @@
-"""
-Generate state-action trajectories plus other useful stats from Shigaki's 
-2020 tethered moth experiments which incorporate wind stimuli.
-IN: path of directory containing log files (csv format)
-OUT: Csv files with state-action trajectories
-"""
-
 __author__      = "Duc-Nhat Luong"
 __copyright__   = "Copyright 2022, The CPT-IRL Project"
 __credits__     = ["Duc-Nhat Luong, Cesar Hernandez-Reyes"]
@@ -22,10 +15,7 @@ import h5py
 import config
 import utilities as util
 from bombyxmdp import preprocessing
-from IRL_execute import app
-from IRL_execute import neo_mothworld
-from IRL_execute import value_iteration
-from IRL_execute import deep_maxent
+from IRL_execute import app, neo_mothworld, value_iteration, deep_maxent
 
 ######################### Data Preprocessing #############################
 # 1) Extracting features from raw data
@@ -33,16 +23,15 @@ from IRL_execute import deep_maxent
 # 3) Export the data and save them on the disk
 ##########################################################################
 
-# Processing raw data to features for machine learning
-dfs = preprocessing.merge_data()
+processed_data = preprocessing.merge_data()
 
 # Encode state, actions and obtain state-action probabilities
-mdp_demos, mdp_edges, transition_prob = util.get_expert_demos(dfs.copy())    
+mdp_demos, bin_edges, transition_prob = util.get_expert_demos(processed_data)    
 
 # Export data for learning process
 out_dir = util.create_output_folder(f'{config.environment}_{util.get_timestamp()}')
 np.save((os.path.join(out_dir, 'trans_prob.npy')), transition_prob)
-util.export_csv(mdp_edges, 'bin_edges.csv', out_dir)
+util.export_csv(bin_edges, 'bin_edges.csv', out_dir)
 util.export_csv(mdp_demos, 'fmdp_demos.csv', out_dir)
 for i, g in mdp_demos.groupby((mdp_demos.Time.diff() < 0).cumsum()):
     util.export_csv(g, f'{len(g.index)}-{i+1}.csv', out_dir)
