@@ -1,9 +1,15 @@
+This project will systematically lead you through the process of utilizing trajectory data from male silkmoths as they locate female silkmoths, with the ultimate goal of designing an artificial agent for odor source localization.
+
+# Learning data
+Data is obtained by recording the male silkmoths' behaviors in the mothVR system described in this [article](https://elifesciences.org/articles/72001).
+
+# Usage 
+## Data preprocessing and learning
+The main program is in main.py where the raw data is processed firstly before passed for inverse reinforcement learning (IRL). The outcome of the IRL will be te reward function.
 
 # Bombyxsim
 
 A simulator for olfactory searches mainly focused on the study of the male silkmoth *Bombyx mori* but aimed to be expandable to other type of agents. The simulator has three main components: **environment**, **agent**, and the agent's **controller**. 
-
-## Usage
 
 The odor plume data will be read from .h5 files with the frames of smoke plume videos. Plumes obtained by Yanagawa's smoke videos using Kanzaki et al. Programmed Behavior (shortened to KPB). You can also run a single simulation and visualize that the movement of the agent makes sense by showing the animation. 
 

@@ -337,5 +337,4 @@ def irl(structure, feature_matrix, n_actions, discount, transition_probability,
 
     for e in tqdm(range(epochs)):
         reward = train(feature_matrix)
-
     return reward.reshape((n_states,))

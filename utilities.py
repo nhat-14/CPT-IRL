@@ -3,6 +3,7 @@ import glob
 from datetime import datetime
 
 import pandas as pd
+import numpy as np
 
 import bombyxmdp.markov_decission_process as mdp
 import config as cfg
@@ -68,3 +69,11 @@ def export_csv(data, file_name, destination_folder):
     """
     filepath = os.path.join(destination_folder, file_name)
     data.to_csv(filepath, index=False, float_format='%.2f')
+
+
+def wrapping_angle_from_0to2pi(angle):
+    mask = angle > np.pi
+    angle[mask] = angle[mask] - 2*np.pi
+    mask = angle < -np.pi
+    angle[mask] = angle[mask] + 2*np.pi
+    return angle

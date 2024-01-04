@@ -80,20 +80,19 @@ class MothMDP(object):
         else:
             self.digi_edges[state.name] = edges
 
-    def merge_categoric_states(self):
-        s0, s1 = tuple(self.categoric_states)
-        sk0, sk1 = tuple([s + '_k' for s in self.categoric_states])
-        b0, b1 = (len(self.df[s0].unique()), len(self.df[s0].unique()))
-        self.df.loc[:, 'state_cat_i'] = self.df[s0] + self.df[s1] * b0
-        self.df.loc[:, 'state_cat_k'] = self.df[sk0] + self.df[sk1] * b0
+    # def merge_categoric_states(self):
+    #     s0, s1 = tuple(self.categoric_states)
+    #     sk0, sk1 = tuple([s + '_k' for s in self.categoric_states])
+    #     b0, b1 = (len(self.df[s0].unique()), len(self.df[s1].unique()))
+    #     print("hahahahaha", b0, b1)
+    #     self.df.loc[:, 'state_cat_i'] = self.df[s0] + self.df[s1] * b0
+    #     self.df.loc[:, 'state_cat_k'] = self.df[sk0] + self.df[sk1] * b0
 
 
     def merge_states(self):
-        ni, nk = ('state_num_i', 'state_num_k')
-        ci, ck = ('state_cat_i', 'state_cat_k')
         num_bits = self.num_state_bits
-        self.df.loc[:, 'state_i'] = self.df[ni] + self.df[ci] * num_bits
-        self.df.loc[:, 'state_k'] = self.df[nk] + self.df[ck] * num_bits
+        self.df.loc[:, 'state_i'] = self.df['state_num_i'] + self.df['state_cat_i'] * num_bits
+        self.df.loc[:, 'state_k'] = self.df['state_num_k'] + self.df['state_cat_k'] * num_bits
 
     def encode_states(self):
         state_obj = NumericState(*self.numeric_states)

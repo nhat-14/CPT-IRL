@@ -70,9 +70,7 @@ for i in range(interation):
         mothworld.transition_probability,
         trajectories,
         config.epochs,
-        config.learning_rate,
-        l1=0,
-        l2=0)
+        config.learning_rate)
     
     # update reward function
     if config.feature_fitting_loop > 0:
@@ -94,7 +92,6 @@ moth_policy = value_iteration.find_policy(mothworld.n_states,
 util.export_csv(pd.DataFrame(moth_policy), 'raw_policy.csv', out_dir)
 simple_policy = np.array([np.argmax(moth_policy[i,:]) for i in range(config.n_states)])
 simple_policy = simple_policy.reshape(config.n_sub_states)
-
 moth_policy = moth_policy.T
 
 util.export_csv(pd.DataFrame(reward), 'Reward.csv', out_dir)

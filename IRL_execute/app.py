@@ -4,7 +4,6 @@ Maximum Entropy IRL and trajectories obtained from wind tunnel experiments.
 """
 
 import os
-from pathlib import Path
 from os.path import join
 
 import numpy as np
@@ -13,7 +12,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 import config as cfg
-from IRL_execute.decision_tree_regression import DecisionTreeRegressor
 import utilities as util
 
 sns.set(font="sans-serif", rc={"font.sans-serif": ["FreeSans", "Arial"]})
@@ -119,18 +117,6 @@ def plot_policy(out_dir):
     print('Plots saved to disk')
 
 
-def create_output_folder():
-    """
-    Create an output folder to store learning results
-    """ 
-    time_log = util.get_timestamp()
-    config_log = f'e{cfg.epochs}_t{cfg.traj_len}_g{cfg.discount}'
-    dir_name = f'DeepMaxEnt_{config_log}_{time_log}'
-    path_obj = Path(join(cfg.input_dir, dir_name))
-    path_obj.mkdir(parents=True, exist_ok=True)
-    return path_obj
-  
-
 def assign_reward_along_trajectory(lookup, mdp_demos):
     """
     Having the reward function, we use it to assign the
@@ -144,26 +130,69 @@ def feature_fitting(reward_matrix, full_demos_data):
     """
     Using decision tree regression to auto select the suitable feature vector
     """
+    from catboost import Pool, CatBoostRegressor
+    from sklearn.model_selection import train_test_split
+
     reward_table = pd.DataFrame({'reward': reward_matrix[:]})
     reward_table['state'] = reward_table.index
 
+    # assign the reward for each states in the full origin demos data
     full_demos_data['reward'] = full_demos_data.state_i.map(reward_table.set_index('state').reward)
+
     feature_name_list = cfg.feature_pool + ["reward"]
     small_data = full_demos_data[feature_name_list]
-    data_len = 10000
-    X = small_data.iloc[:data_len, :-1].values
-    Y = small_data.iloc[:data_len, -1].values.reshape(-1,1)
-    regressor = DecisionTreeRegressor(min_samples_split=3, max_depth=3)
-    regressor.fit(X,Y)
-    regressor.print_tree()
-    regressor.list_conditional_node()
-    print(regressor.get_node_list())
+    data_len = 40000
+
+    # X = small_data.iloc[:data_len, :-1].values
+    # Y = small_data.iloc[:data_len, -1].values.reshape(-1,1)
     
-    next_feature_set = []
-    for i, name in enumerate(feature_name_list):
-        for j in regressor.get_node_list():
-            if j == i:
-                next_feature_set.append(name)
+    train, test = train_test_split(small_data, test_size=0.2)
+    train_pool = Pool(data = train.iloc[:, :-1], 
+                label = train.iloc[:, -1], 
+                # cat_features=cfg.cat_features,
+                )
+
+    test_pool = Pool(data = test.iloc[:, :-1], 
+                label = test.iloc[:, -1], 
+                # cat_features=cfg.cat_features
+                )
+
+    # specify the training parameters 
+    model = CatBoostRegressor(iterations=8000, 
+                            depth=3, 
+                            verbose=200,
+                            learning_rate=0.02, 
+                            loss_function='RMSE',
+                            early_stopping_rounds=50)
+    model.fit(train_pool)
+    a = model.plot_tree(tree_idx=0)
+    a.render()
+
+
+    next_feature_set = model.select_features(train_pool, 
+                                eval_set=test_pool,
+                                steps=3,
+                                features_for_select=cfg.feature_pool,
+                                train_final_model=False,
+                                num_features_to_select=3,
+                                plot=True,
+                                ).get("selected_features_names")
+
+    
+
+
+    # regressor = DecisionTreeRegressor(min_samples_split=3, max_depth=3)
+    # regressor.fit(X,Y)
+    # regressor.print_tree()
+    # regressor.list_conditional_node()
+    # print(regressor.get_node_list())
+    
+
+    # next_feature_set = []
+    # for i, name in enumerate(feature_name_list):
+    #     for j in regressor.get_node_list():
+    #         if j == i:
+    #             next_feature_set.append(name)
     print(next_feature_set)
     next_matrix = full_demos_data.groupby('state_i')[next_feature_set].median()
     next_matrix = state_lacking_handel(next_matrix, next_feature_set)
@@ -189,7 +218,6 @@ def get_feature_matrix(full_demos_data):
     matrix = np.eye(cfg.n_states)   # unit vector feature
     if cfg.feature_fitting_loop == 0:
         features_name = ['wind', 'angular_vel']
-        # features_name = ['whiff', 'hit_rate', 'lasthit', 'region_x', 'obstacle_distance']
         # mean() or median() is better?
         matrix = full_demos_data.groupby('state_i')[features_name].median()
         # matrix = matrix.astype('uint8')

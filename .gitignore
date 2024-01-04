@@ -62,3 +62,9 @@ simulator/bombyxsim-template/silkmoth_smokevid*
 *.npy
 /videoToH5/*.mp4
 /output
+
+
+# catboost-related files
+/catboost_info
+Digraph.gv
+Digraph.gv.pdf

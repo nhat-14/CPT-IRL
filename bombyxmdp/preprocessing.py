@@ -7,6 +7,7 @@ import config as cfg
 import utilities as util   
 
 
+
 def get_df_from_csv(file_name) -> pd.DataFrame:
     """
     Return a full formated panda data frame from csv
@@ -32,13 +33,7 @@ def is_source_found(data) -> bool:
     """
     last_x = data['x_mm'].iloc[-1]
     last_y = data['y_mm'].iloc[-1]
-    return np.sqrt(last_x**2 + last_y**2) <= cfg.GOAL_RADII
-
-
-def cal_velocities(data):
-    get_linear_vel(data)
-    get_angular_vel(data)
-    moving_averaged_velocity(data, cfg.WINDOW_SIZE)
+    return np.sqrt(last_x**2 + last_y**2) <= cfg.goal_radii
 
 
 def cal_travelled_distance(data):
@@ -66,18 +61,11 @@ def get_angular_vel(data):
     change during time step duration
     """
     theta = data['theta_rad'].to_numpy()
-    delta_theta = (theta[1:] - theta[:-1])
-    wrapping_angle_from_0to2pi(delta_theta)
+    d_theta = (theta[1:] - theta[:-1])
+    d_theta = util.wrapping_angle_from_0to2pi(d_theta)
     # insert 0 at 0 index to have the same length with
-    delta_theta = np.insert(delta_theta, 0, 0)
-    data['angular_vel'] = delta_theta / cfg.time_step
-
-
-def wrapping_angle_from_0to2pi(angle):
-    mask = angle > np.pi
-    angle[mask] = angle[mask] - 2*np.pi
-    mask = angle < -np.pi
-    angle[mask] = angle[mask] + 2*np.pi
+    d_theta = np.insert(d_theta, 0, 0)
+    data['angular_vel'] = d_theta / cfg.time_step
 
 
 def cal_centerline_deviation(data):
@@ -137,7 +125,7 @@ def fill_future_states(data):
     """
     Shift one time step to show what is the next state given current state
     """
-    for state in ["tblank", "log_tblank", "antennae", "hits_count", "wind", "region_x"]:
+    for state in ["tblank", "log_tblank", "antennae", "hits_count", "wind", "region_x", "wind_B", "wind_F", "wind_L", "wind_R"]:
         data[f'{state}_k'] = data.loc[:, state].shift(-1, fill_value=0)
 
 
@@ -171,11 +159,25 @@ def numerize_antennae(data):
     antennae_dict = {'N': 0, 'R': 1, 'L': 2, 'B': 3}
     data['antennae'] = data['antennae'].map(antennae_dict)
 
+    # one_hot = pd.get_dummies(data['antennae'])
+    # data = data.join(one_hot)
+    # antennae_dict = ('N', 'R', 'L', 'B')
+    # data.columns = [f'antennae_{x}' if x in antennae_dict else x for x in data.columns]
+    # return data
+
 
 def numerize_wind(data):
-    wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
-    data['wind'] = data['wind'].map(wind_dict)
+    # wind_dict = {'B': 0, 'R': 1, 'L': 2, 'F': 3}
+    # data['wind'] = data['wind'].map(wind_dict)
 
+    one_hot = pd.get_dummies(data['wind'])
+    # # Drop column as it is now encoded
+    # data = data.drop('wind',axis = 1)
+    # Join the encoded df
+    data = data.join(one_hot)
+    wind_dict = ('B', 'R', 'L', 'F')
+    data.columns = [f'wind_{x}' if x in wind_dict else x for x in data.columns]
+    return data
 
 def cal_whiff_duration(data):
     dt = cfg.time_step
@@ -260,13 +262,15 @@ def cal_dist2obstcle(data):
 
 def extract_features(data):
     # ===== free-environment features extractation ====
-    cal_velocities(data)
+    get_linear_vel(data)
+    get_angular_vel(data)
+    moving_averaged_velocity(data, cfg.window_size)
     cal_travelled_distance(data)
     cal_tortuosity(data)
     cal_centerline_deviation(data)
     cal_moth_heading(data)
     numerize_antennae(data)
-    numerize_wind(data)
+    data = numerize_wind(data)
     cal_hit_related_features(data)
     cal_last_hit(data)
     cal_time_blank(data)
@@ -277,6 +281,7 @@ def extract_features(data):
     cal_dist2obstcle(data)
     cal_heading_to_obstacle(data)
     fill_future_states(data)
+    return data
 
 
 def merge_data() -> pd.DataFrame:
@@ -292,7 +297,7 @@ def merge_data() -> pd.DataFrame:
         # only use the moth search with runtime within timeout 
         if not is_timeout(df): 
             n_success += int(is_source_found(df))
-            extract_features(df)
+            df = extract_features(df)
             merged_df = pd.concat([merged_df, df], ignore_index=True)
     print(f'Successful runs: {n_success}/{len(csv_list)}')
     return merged_df
